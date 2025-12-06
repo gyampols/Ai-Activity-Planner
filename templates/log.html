@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log - AI Activity Planner{% endblock %}
+
+{% block content %}
+<h1>Activity Log</h1>
+
+<div class="card">
+    <h2>Fitness Tracker Integration</h2>
+    <p style="margin-bottom: 1rem;">Connect your fitness trackers to enhance your activity planning:</p>
+    <form method="POST" action="{{ url_for('connect_fitbit') }}" style="display: inline;">
+        <button type="submit" class="btn btn-primary" {% if current_user.fitbit_connected %}disabled{% endif %}>
+            {% if current_user.fitbit_connected %}✓ Fitbit Connected{% else %}Connect Fitbit{% endif %}
+        </button>
+    </form>
+    <form method="POST" action="{{ url_for('connect_oura') }}" style="display: inline; margin-left: 1rem;">
+        <button type="submit" class="btn btn-primary" {% if current_user.oura_connected %}disabled{% endif %}>
+            {% if current_user.oura_connected %}✓ Oura Connected{% else %}Connect Oura{% endif %}
+        </button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Add New Activity</h2>
+    <form method="POST" action="{{ url_for('add_activity') }}">
+        <div class="form-group">
+            <label for="name">Activity Name *</label>
+            <input type="text" id="name" name="name" required placeholder="e.g., Morning Run, Yoga, Swimming">
+        </div>
+        
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" placeholder="e.g., Local Park, Gym, Home">
+        </div>
+        
+        <div class="form-group">
+            <label for="duration">Duration (minutes)</label>
+            <input type="number" id="duration" name="duration" min="1" placeholder="e.g., 30, 60, 90">
+        </div>
+        
+        <div class="form-group">
+            <label for="intensity">Intensity Level</label>
+            <select id="intensity" name="intensity">
+                <option value="">Select intensity</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="dependencies">Dependencies</label>
+            <input type="text" id="dependencies" name="dependencies" placeholder="e.g., Good weather, Equipment needed">
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Additional notes about this activity..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-success">Add Activity</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Your Activities</h2>
+    {% if activities %}
+        <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+            {% for activity in activities %}
+                <div style="border: 1px solid #ddd; padding: 1rem; border-radius: 4px;">
+                    <h3 style="margin-bottom: 0.5rem;">{{ activity.name }}</h3>
+                    {% if activity.location %}
+                        <p><strong>Location:</strong> {{ activity.location }}</p>
+                    {% endif %}
+                    {% if activity.duration_minutes %}
+                        <p><strong>Duration:</strong> {{ activity.duration_minutes }} minutes</p>
+                    {% endif %}
+                    {% if activity.intensity %}
+                        <p><strong>Intensity:</strong> {{ activity.intensity }}</p>
+                    {% endif %}
+                    {% if activity.dependencies %}
+                        <p><strong>Dependencies:</strong> {{ activity.dependencies }}</p>
+                    {% endif %}
+                    {% if activity.description %}
+                        <p><strong>Description:</strong> {{ activity.description }}</p>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('delete_activity', activity_id=activity.id) }}" style="margin-top: 1rem;">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin-top: 1rem; color: #666;">No activities logged yet. Add your first activity above!</p>
+    {% endif %}
+</div>
+{% endblock %}

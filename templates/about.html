@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}About - AI Activity Planner{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>About AI Activity Planner</h1>
+    
+    <h2 style="margin-top: 2rem;">Our Mission</h2>
+    <p style="margin-top: 1rem; line-height: 1.8;">
+        AI Activity Planner helps you maintain a balanced and active lifestyle by intelligently 
+        scheduling your favorite activities throughout the week. Whether you're into running, 
+        yoga, swimming, or any other activity, our AI-powered system creates personalized plans 
+        that consider your preferences, fitness levels, and schedule constraints.
+    </p>
+    
+    <h2 style="margin-top: 2rem;">How It Works</h2>
+    <div style="margin-top: 1rem;">
+        <h3 style="margin-top: 1.5rem;">1. Log Your Activities</h3>
+        <p style="line-height: 1.8;">
+            Add activities you enjoy with details like location, duration, intensity level, 
+            and any dependencies (weather, equipment, etc.). The more information you provide, 
+            the better your personalized plan will be.
+        </p>
+        
+        <h3 style="margin-top: 1.5rem;">2. Connect Your Devices (Optional)</h3>
+        <p style="line-height: 1.8;">
+            Integrate your Fitbit or Oura account to help the AI understand your activity 
+            patterns and recovery needs. This allows for more accurate and personalized planning.
+        </p>
+        
+        <h3 style="margin-top: 1.5rem;">3. Generate Your Weekly Plan</h3>
+        <p style="line-height: 1.8;">
+            Our AI assistant, powered by OpenAI's ChatGPT, analyzes your activities and creates 
+            a balanced weekly schedule. The plan considers intensity distribution, recovery time, 
+            weather dependencies, and location requirements to ensure optimal results.
+        </p>
+    </div>
+    
+    <h2 style="margin-top: 2rem;">Technology</h2>
+    <p style="margin-top: 1rem; line-height: 1.8;">
+        This application is built with Flask and deployed on Google App Engine. It uses 
+        OpenAI's ChatGPT API for intelligent activity planning and supports integration 
+        with popular fitness tracking devices.
+    </p>
+</div>
+{% endblock %}

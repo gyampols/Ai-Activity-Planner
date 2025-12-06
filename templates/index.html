@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Home - AI Activity Planner{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Welcome to AI Activity Planner</h1>
+    <p style="font-size: 1.1rem; margin-top: 1rem; line-height: 1.8;">
+        Plan your week with AI-powered activity scheduling. Log your favorite activities, 
+        connect your fitness trackers, and let our AI create the perfect weekly plan for you!
+    </p>
+    
+    {% if not current_user.is_authenticated %}
+    <div style="margin-top: 2rem;">
+        <a href="{{ url_for('signup') }}" class="btn btn-primary" style="margin-right: 1rem;">Get Started</a>
+        <a href="{{ url_for('login') }}" class="btn btn-success">Login</a>
+    </div>
+    {% else %}
+    <div style="margin-top: 2rem;">
+        <p>Welcome back, {{ current_user.username }}!</p>
+        <a href="{{ url_for('log') }}" class="btn btn-primary" style="margin-right: 1rem;">Manage Activities</a>
+        <a href="{{ url_for('plan') }}" class="btn btn-success">Generate Plan</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Features</h2>
+    <ul style="margin-left: 1.5rem; line-height: 2;">
+        <li><strong>Activity Logging:</strong> Keep track of activities you enjoy with detailed information</li>
+        <li><strong>AI-Powered Planning:</strong> Get personalized weekly plans using ChatGPT</li>
+        <li><strong>Fitness Tracker Integration:</strong> Connect your Fitbit or Oura account</li>
+        <li><strong>Smart Scheduling:</strong> Plans consider duration, intensity, and dependencies</li>
+    </ul>
+</div>
+{% endblock %}
