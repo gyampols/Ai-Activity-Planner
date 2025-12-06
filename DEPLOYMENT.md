@@ -118,9 +118,38 @@ For production on Google App Engine, consider migrating to Cloud SQL (PostgreSQL
 
 ## Security Considerations
 
-- Change the `SECRET_KEY` in production
-- Use strong passwords
-- Enable HTTPS (automatic on App Engine)
-- Store API keys securely (use Secret Manager)
-- Implement rate limiting for API calls
-- Add CSRF protection for production use
+### Required for Production
+
+- **Change SECRET_KEY**: Generate a strong random secret key (not 'dev-secret-key')
+- **Disable Debug Mode**: Set `debug=False` in app.run() or use gunicorn
+- **Use Strong Passwords**: Enforce password complexity requirements
+- **Enable HTTPS**: Automatic on App Engine, required for production
+- **Secure API Keys**: Use Google Secret Manager or environment variables
+- **Rate Limiting**: Implement rate limiting for API endpoints
+- **CSRF Protection**: Already enabled with Flask-WTF
+- **Input Validation**: All forms have validation enabled
+- **XSS Protection**: All user input is properly escaped
+- **SQL Injection**: SQLAlchemy ORM prevents SQL injection
+
+### Security Features Included
+
+✅ CSRF Protection (Flask-WTF)
+✅ Password Hashing (Werkzeug)
+✅ Session Management (Flask-Login)
+✅ Input Validation (all forms)
+✅ XSS Prevention (textContent usage)
+✅ Open Redirect Protection
+✅ URL Encoding (weather API)
+
+### Production Security Checklist
+
+- [ ] Set strong SECRET_KEY in environment
+- [ ] Disable debug mode (debug=False)
+- [ ] Use HTTPS only (no HTTP)
+- [ ] Configure Content Security Policy headers
+- [ ] Enable rate limiting
+- [ ] Set up monitoring and alerts
+- [ ] Regular security audits
+- [ ] Keep dependencies updated
+- [ ] Use environment-specific configurations
+- [ ] Enable logging for security events

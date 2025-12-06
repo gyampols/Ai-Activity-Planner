@@ -412,4 +412,6 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    # WARNING: Debug mode should be disabled in production
+    # Set debug=False when deploying to production environments
     app.run(debug=True)
