@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log - AI Activity Planner{% endblock %}
+
+{% block content %}
+<h1>Activity Log</h1>
+
+<div class="card">
+    <h2>Account Connections</h2>
+    <p style="margin-bottom: 1rem;">Connect your accounts to enhance your activity planning:</p>
+    
+    <div style="margin-bottom: 1rem;">
+        {% if not current_user.google_id %}
+        <a href="{{ url_for('connect_google') }}" class="btn" style="background: #4285f4; color: white; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+            <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            Connect Google Account
+        </a>
+        {% else %}
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+            <button class="btn btn-primary" disabled>✓ Google Connected</button>
+            <form method="POST" action="{{ url_for('disconnect_google') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect your Google account?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 1rem;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Fitness Trackers:</h3>
+        
+        <!-- Fitbit Connection -->
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-right: 1rem; margin-bottom: 0.5rem;">
+            {% if not current_user.fitbit_connected %}
+            <form method="POST" action="{{ url_for('connect_fitbit') }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-primary">Connect Fitbit</button>
+            </form>
+            {% else %}
+            <button class="btn btn-primary" disabled>✓ Fitbit Connected</button>
+            <form method="POST" action="{{ url_for('disconnect_fitbit') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Fitbit?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
+            </form>
+            {% endif %}
+        </div>
+        
+        <!-- Oura Connection -->
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            {% if not current_user.oura_connected %}
+            <form method="POST" action="{{ url_for('connect_oura') }}" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-primary">Connect Oura</button>
+            </form>
+            {% else %}
+            <button class="btn btn-primary" disabled>✓ Oura Connected</button>
+            <form method="POST" action="{{ url_for('disconnect_oura') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Oura?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Add New Activity</h2>
+    <form method="POST" action="{{ url_for('add_activity') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group">
+            <label for="name">Activity Name *</label>
+            <input type="text" id="name" name="name" required placeholder="e.g., Morning Run, Yoga, Swimming">
+        </div>
+        
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" placeholder="e.g., Local Park, Gym, Home">
+        </div>
+        
+        <div class="form-group">
+            <label for="duration">Duration (minutes)</label>
+            <input type="number" id="duration" name="duration" min="1" placeholder="e.g., 30, 60, 90">
+        </div>
+        
+        <div class="form-group">
+            <label for="intensity">Intensity Level</label>
+            <select id="intensity" name="intensity">
+                <option value="">Select intensity</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="dependencies">Dependencies</label>
+            <input type="text" id="dependencies" name="dependencies" placeholder="e.g., Good weather, Equipment needed">
+        </div>
+        
+        <div class="form-group">
+            <label for="preferred_time">Preferred Time of Day</label>
+            <select id="preferred_time" name="preferred_time">
+                <option value="">No preference</option>
+                <option value="Morning">Morning (6 AM - 12 PM)</option>
+                <option value="Afternoon">Afternoon (12 PM - 5 PM)</option>
+                <option value="Evening">Evening (5 PM - 9 PM)</option>
+                <option value="Night">Night (9 PM - 12 AM)</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="preferred_days">Preferred Days of Week</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem;">
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Monday" style="margin: 0;"> <span>Monday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Tuesday" style="margin: 0;"> <span>Tuesday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Wednesday" style="margin: 0;"> <span>Wednesday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Thursday" style="margin: 0;"> <span>Thursday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Friday" style="margin: 0;"> <span>Friday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Saturday" style="margin: 0;"> <span>Saturday</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Sunday" style="margin: 0;"> <span>Sunday</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Additional notes about this activity..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-success">Add Activity</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Your Activities</h2>
+    {% if activities %}
+        <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+            {% for activity in activities %}
+                <div style="border: 1px solid #ddd; padding: 1rem; border-radius: 4px;">
+                    <h3 style="margin-bottom: 0.5rem;">{{ activity.name }}</h3>
+                    {% if activity.location %}
+                        <p><strong>Location:</strong> {{ activity.location }}</p>
+                    {% endif %}
+                    {% if activity.duration_minutes %}
+                        <p><strong>Duration:</strong> {{ activity.duration_minutes }} minutes</p>
+                    {% endif %}
+                    {% if activity.intensity %}
+                        <p><strong>Intensity:</strong> {{ activity.intensity }}</p>
+                    {% endif %}
+                    {% if activity.dependencies %}
+                        <p><strong>Dependencies:</strong> {{ activity.dependencies }}</p>
+                    {% endif %}
+                    {% if activity.preferred_time %}
+                        <p><strong>Preferred Time:</strong> {{ activity.preferred_time }}</p>
+                    {% endif %}
+                    {% if activity.preferred_days %}
+                        <p><strong>Preferred Days:</strong> {{ activity.preferred_days }}</p>
+                    {% endif %}
+                    {% if activity.description %}
+                        <p><strong>Description:</strong> {{ activity.description }}</p>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('delete_activity', activity_id=activity.id) }}" style="margin-top: 1rem;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin-top: 1rem; color: #666;">No activities logged yet. Add your first activity above!</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Add Appointment/Responsibility</h2>
+    <form method="POST" action="{{ url_for('add_appointment') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group">
+            <label for="title">Title *</label>
+            <input type="text" id="title" name="title" required placeholder="e.g., Doctor Appointment, Work Meeting, School">
+        </div>
+        
+        <div class="form-group">
+            <label for="appointment_type">Type</label>
+            <select id="appointment_type" name="appointment_type">
+                <option value="Work">Work</option>
+                <option value="School">School</option>
+                <option value="Doctor">Doctor/Medical</option>
+                <option value="Plans">Plans/Social</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="date">Date *</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="time">Time (optional)</label>
+                <input type="time" id="time" name="time">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="appointment_duration">Duration (minutes, optional)</label>
+            <input type="number" id="appointment_duration" name="duration_minutes" min="1" placeholder="e.g., 30, 60, 120">
+        </div>
+        
+        <div class="form-group">
+            <label for="appointment_description">Description</label>
+            <textarea id="appointment_description" name="description" placeholder="Additional details..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-success">Add Appointment</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Your Appointments & Responsibilities</h2>
+    {% if appointments %}
+        <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+            {% for appointment in appointments %}
+                <div style="border: 1px solid #ddd; padding: 1rem; border-radius: 4px; background: {% if appointment.appointment_type == 'Work' %}#fff3cd{% elif appointment.appointment_type == 'School' %}#d1ecf1{% elif appointment.appointment_type == 'Doctor' %}#f8d7da{% elif appointment.appointment_type == 'Plans' %}#d4edda{% else %}#f8f9fa{% endif %};">
+                    <h3 style="margin-bottom: 0.5rem;">{{ appointment.title }}</h3>
+                    <p><strong>Type:</strong> {{ appointment.appointment_type }}</p>
+                    <p><strong>Date:</strong> {{ appointment.date.strftime('%A, %B %d, %Y') }}</p>
+                    {% if appointment.time %}
+                        <p><strong>Time:</strong> {{ appointment.time.strftime('%I:%M %p') }}</p>
+                    {% endif %}
+                    {% if appointment.duration_minutes %}
+                        <p><strong>Duration:</strong> {{ appointment.duration_minutes }} minutes</p>
+                    {% endif %}
+                    {% if appointment.description %}
+                        <p><strong>Description:</strong> {{ appointment.description }}</p>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('delete_appointment', appointment_id=appointment.id) }}" style="margin-top: 1rem;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this appointment?')">Delete</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin-top: 1rem; color: #666;">No appointments scheduled yet. Add your first appointment above!</p>
+    {% endif %}
+</div>
+{% endblock %}

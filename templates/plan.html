@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Plan - AI Activity Planner{% endblock %}
+
+{% block extra_css %}
+<style>
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .calendar-day {
+        background: white;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        min-height: 150px;
+        transition: all 0.3s;
+    }
+    
+    .calendar-day:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .calendar-day-header {
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #3498db;
+    }
+    
+    .calendar-activity {
+        background: #e3f2fd;
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin: 0.5rem 0;
+        font-weight: 600;
+        color: #1976d2;
+    }
+    
+    .calendar-notes {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+    
+    .calendar-weather {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 0.3rem;
+        padding-top: 0.3rem;
+        border-top: 1px solid #eee;
+    }
+    
+    .rest-day {
+        background: #f8f9fa;
+        border-color: #ced4da;
+    }
+    
+    .rest-day .calendar-activity {
+        background: #e9ecef;
+        color: #6c757d;
+    }
+    
+    .weather-section {
+        background: #f0f8ff;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .weather-day {
+        display: inline-block;
+        margin: 0.5rem;
+        padding: 0.5rem;
+        background: white;
+        border-radius: 4px;
+        text-align: center;
+        min-width: 100px;
+    }
+    
+    #loading {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 1200px) {
+        .calendar-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .calendar-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .calendar-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        display: none;
+    }
+    
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .autocomplete-item:hover {
+        background-color: #f0f8ff;
+    }
+    
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Generate Weekly Plan</h1>
+
+<div class="card">
+    <h2>Location & Weather</h2>
+    <form method="POST" style="margin-bottom: 1rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group" style="position: relative;">
+            <label for="location">Your Location (City)</label>
+            <input type="text" id="location" name="location" value="{{ current_user.location or '' }}" 
+                   placeholder="e.g., San Francisco, London, Tokyo" required autocomplete="off">
+            <div id="location-dropdown" class="autocomplete-dropdown"></div>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Location</button>
+    </form>
+    
+    {% if weather_forecast %}
+    <div class="weather-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">7-Day Weather Forecast</h3>
+            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.5rem 1rem;">
+                Switch to °{{ 'C' if current_user.temperature_unit == 'F' else 'F' }}
+            </button>
+        </div>
+        <div style="overflow-x: auto;">
+            {% for day in weather_forecast %}
+                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db;"{% endif %}>
+                    <strong>{{ day.date_short }}{% if day.is_today %} (Today){% endif %}</strong><br>
+                    🌡️ <span class="temp-display">{{ day.temp_max }}°{{ current_user.temperature_unit or 'C' }}</span><br>
+                    💧 {{ day.precipitation }}%<br>
+                    <small style="color: #666;">
+                        🌅 {{ day.sunrise }}<br>
+                        🌇 {{ day.sunset }}
+                    </small>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Your Activities</h2>
+    {% if activities %}
+        <div style="margin-top: 1rem;">
+            {% for activity in activities %}
+                <div style="background: #f8f9fa; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px;">
+                    <strong>{{ activity.name }}</strong>
+                    {% if activity.duration_minutes %}
+                        - {{ activity.duration_minutes }} min
+                    {% endif %}
+                    {% if activity.intensity %}
+                        ({{ activity.intensity }})
+                    {% endif %}
+                    {% if activity.dependencies %}
+                        - {{ activity.dependencies }}
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        
+        {% if current_user.fitbit_connected %}
+            <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 4px;">
+                {% if current_user.fitbit_readiness_score %}
+                    <strong>Fitbit Readiness:</strong> {{ current_user.fitbit_readiness_score }}/100
+                {% endif %}
+                {% if current_user.fitbit_sleep_score %}
+                    {% if current_user.fitbit_readiness_score %}<br>{% endif %}
+                    <strong>Sleep Score:</strong> {{ current_user.fitbit_sleep_score }}%
+                {% endif %}
+                {% if not current_user.fitbit_readiness_score and not current_user.fitbit_sleep_score %}
+                    <strong>Fitbit Connected</strong> - Sync your device to see scores
+                {% endif %}
+            </div>
+        {% elif current_user.oura_connected and current_user.oura_readiness_score %}
+            <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 4px;">
+                <strong>Oura Readiness:</strong> {{ current_user.oura_readiness_score }}/100
+            </div>
+        {% endif %}
+        
+        <div style="margin-top: 1.5rem;">
+            <label for="extra-info" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Additional Information (Optional)
+            </label>
+            <textarea 
+                id="extra-info" 
+                placeholder="Add any extra context for your plan (e.g., recovering from injury, training for event, specific goals, time constraints, etc.)"
+                style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; resize: vertical;"
+            ></textarea>
+        </div>
+        
+        <button id="generate-btn" class="btn btn-success" style="margin-top: 1rem;">
+            🤖 Generate AI-Powered Weekly Plan
+        </button>
+        
+        <div id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 1rem;">Generating your personalized plan with weather data...</p>
+        </div>
+        
+        <div id="calendar-container" style="display: none; margin-top: 2rem;">
+            <h2>Your Weekly Activity Calendar</h2>
+            <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+    {% else %}
+        <p style="margin-top: 1rem; color: #666;">
+            You haven't added any activities yet. 
+            <a href="{{ url_for('log') }}" style="color: #3498db;">Add some activities</a> 
+            to generate a plan.
+        </p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('generate-btn')?.addEventListener('click', async function() {
+        const btn = this;
+        const loading = document.getElementById('loading');
+        const calendarContainer = document.getElementById('calendar-container');
+        const calendarGrid = document.getElementById('calendar-grid');
+        const extraInfo = document.getElementById('extra-info')?.value || '';
+        
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        loading.style.display = 'block';
+        calendarContainer.style.display = 'none';
+        
+        try {
+            const response = await fetch('{{ url_for("generate_plan") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    extra_info: extraInfo
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                console.log('Received data:', data); // Debug log
+                if (data.structured && typeof data.plan === 'object') {
+                    // Display as calendar
+                    calendarGrid.innerHTML = '';
+                    const plan = data.plan;
+                    
+                    // Sort by date keys to ensure proper order
+                    const dateKeys = Object.keys(plan).sort();
+                    
+                    dateKeys.forEach(dateKey => {
+                        const dayData = plan[dateKey];
+                        const dayCard = document.createElement('div');
+                        const isRest = (dayData.activity || '').toLowerCase().includes('rest');
+                        dayCard.className = 'calendar-day' + (isRest ? ' rest-day' : '');
+                        
+                        // Create elements safely to prevent XSS
+                        const header = document.createElement('div');
+                        header.className = 'calendar-day-header';
+                        header.textContent = dayData.day_name || dateKey;
+                        dayCard.appendChild(header);
+                        
+                        const activity = document.createElement('div');
+                        activity.className = 'calendar-activity';
+                        activity.textContent = dayData.activity || 'No activity';
+                        dayCard.appendChild(activity);
+                        
+                        if (dayData.notes) {
+                            const notes = document.createElement('div');
+                            notes.className = 'calendar-notes';
+                            notes.textContent = dayData.notes;
+                            dayCard.appendChild(notes);
+                        }
+                        
+                        if (dayData.weather) {
+                            const weather = document.createElement('div');
+                            weather.className = 'calendar-weather';
+                            weather.textContent = '☁️ ' + dayData.weather;
+                            dayCard.appendChild(weather);
+                        }
+                        
+                        calendarGrid.appendChild(dayCard);
+                    });
+                    
+                    calendarContainer.style.display = 'block';
+                } else {
+                    // Display as text (fallback) - use textContent to prevent XSS
+                    const fallbackDiv = document.createElement('div');
+                    fallbackDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap;';
+                    fallbackDiv.textContent = data.plan;
+                    calendarGrid.innerHTML = '';
+                    calendarGrid.appendChild(fallbackDiv);
+                    calendarContainer.style.display = 'block';
+                }
+            } else {
+                // Display error - use textContent to prevent XSS
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;';
+                errorDiv.textContent = 'Error: ' + (data.error || 'Failed to generate plan');
+                calendarGrid.innerHTML = '';
+                calendarGrid.appendChild(errorDiv);
+                calendarContainer.style.display = 'block';
+            }
+        } catch (error) {
+            // Display error - use textContent to prevent XSS
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;';
+            errorDiv.textContent = 'Error: ' + error.message;
+            calendarGrid.innerHTML = '';
+            calendarGrid.appendChild(errorDiv);
+            calendarContainer.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🤖 Generate AI-Powered Weekly Plan';
+            loading.style.display = 'none';
+        }
+    });
+
+    // Location autocomplete
+    const locationInput = document.getElementById('location');
+    const dropdown = document.getElementById('location-dropdown');
+    let searchTimeout;
+
+    locationInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/search_cities?q=${encodeURIComponent(query)}`);
+                const cities = await response.json();
+                
+                if (cities.length > 0) {
+                    dropdown.innerHTML = cities.map(city => 
+                        `<div class="autocomplete-item" data-city="${city.name}">${city.display}</div>`
+                    ).join('');
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('City search error:', error);
+                dropdown.style.display = 'none';
+            }
+        }, 300);
+    });
+
+    dropdown.addEventListener('click', function(e) {
+        if (e.target.classList.contains('autocomplete-item')) {
+            locationInput.value = e.target.dataset.city;
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== locationInput && e.target !== dropdown) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Temperature unit toggle
+    const toggleTempBtn = document.getElementById('toggle-temp');
+    if (toggleTempBtn) {
+        toggleTempBtn.addEventListener('click', async function() {
+            try {
+                const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
+                const response = await fetch('/toggle_temperature_unit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    // Reload page to show new temperatures
+                    window.location.reload();
+                } else {
+                    console.error('Temperature toggle failed:', data);
+                }
+            } catch (error) {
+                console.error('Temperature toggle error:', error);
+            }
+        });
+    }
+</script>
+{% endblock %}
