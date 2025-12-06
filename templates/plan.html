@@ -121,6 +121,36 @@
             grid-template-columns: 1fr;
         }
     }
+    
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        display: none;
+    }
+    
+    .autocomplete-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .autocomplete-item:hover {
+        background-color: #f0f8ff;
+    }
+    
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
 </style>
 {% endblock %}
 
@@ -130,23 +160,34 @@
 <div class="card">
     <h2>Location & Weather</h2>
     <form method="POST" style="margin-bottom: 1rem;">
-        <div class="form-group">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="form-group" style="position: relative;">
             <label for="location">Your Location (City)</label>
             <input type="text" id="location" name="location" value="{{ current_user.location or '' }}" 
-                   placeholder="e.g., San Francisco, London, Tokyo" required>
+                   placeholder="e.g., San Francisco, London, Tokyo" required autocomplete="off">
+            <div id="location-dropdown" class="autocomplete-dropdown"></div>
         </div>
         <button type="submit" class="btn btn-primary">Update Location</button>
     </form>
     
     {% if weather_forecast %}
     <div class="weather-section">
-        <h3>7-Day Weather Forecast</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">7-Day Weather Forecast</h3>
+            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.5rem 1rem;">
+                Switch to °{{ 'C' if current_user.temperature_unit == 'F' else 'F' }}
+            </button>
+        </div>
         <div style="overflow-x: auto;">
             {% for day in weather_forecast %}
-                <div class="weather-day">
-                    <strong>{{ day.date_short }}</strong><br>
-                    🌡️ {{ day.temp_max }}°C<br>
-                    💧 {{ day.precipitation }}%
+                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db;"{% endif %}>
+                    <strong>{{ day.date_short }}{% if day.is_today %} (Today){% endif %}</strong><br>
+                    🌡️ <span class="temp-display">{{ day.temp_max }}°{{ current_user.temperature_unit or 'C' }}</span><br>
+                    💧 {{ day.precipitation }}%<br>
+                    <small style="color: #666;">
+                        🌅 {{ day.sunrise }}<br>
+                        🌇 {{ day.sunset }}
+                    </small>
                 </div>
             {% endfor %}
         </div>
@@ -174,9 +215,18 @@
             {% endfor %}
         </div>
         
-        {% if current_user.fitbit_connected and current_user.fitbit_readiness_score %}
+        {% if current_user.fitbit_connected %}
             <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 4px;">
-                <strong>Fitbit Readiness:</strong> {{ current_user.fitbit_readiness_score }}/100
+                {% if current_user.fitbit_readiness_score %}
+                    <strong>Fitbit Readiness:</strong> {{ current_user.fitbit_readiness_score }}/100
+                {% endif %}
+                {% if current_user.fitbit_sleep_score %}
+                    {% if current_user.fitbit_readiness_score %}<br>{% endif %}
+                    <strong>Sleep Score:</strong> {{ current_user.fitbit_sleep_score }}%
+                {% endif %}
+                {% if not current_user.fitbit_readiness_score and not current_user.fitbit_sleep_score %}
+                    <strong>Fitbit Connected</strong> - Sync your device to see scores
+                {% endif %}
             </div>
         {% elif current_user.oura_connected and current_user.oura_readiness_score %}
             <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 4px;">
@@ -184,7 +234,18 @@
             </div>
         {% endif %}
         
-        <button id="generate-btn" class="btn btn-success" style="margin-top: 1.5rem;">
+        <div style="margin-top: 1.5rem;">
+            <label for="extra-info" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Additional Information (Optional)
+            </label>
+            <textarea 
+                id="extra-info" 
+                placeholder="Add any extra context for your plan (e.g., recovering from injury, training for event, specific goals, time constraints, etc.)"
+                style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; resize: vertical;"
+            ></textarea>
+        </div>
+        
+        <button id="generate-btn" class="btn btn-success" style="margin-top: 1rem;">
             🤖 Generate AI-Powered Weekly Plan
         </button>
         
@@ -214,6 +275,7 @@
         const loading = document.getElementById('loading');
         const calendarContainer = document.getElementById('calendar-container');
         const calendarGrid = document.getElementById('calendar-grid');
+        const extraInfo = document.getElementById('extra-info')?.value || '';
         
         btn.disabled = true;
         btn.textContent = 'Generating...';
@@ -225,51 +287,56 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                    extra_info: extraInfo
+                })
             });
             
             const data = await response.json();
             
             if (response.ok) {
-                if (data.structured) {
+                console.log('Received data:', data); // Debug log
+                if (data.structured && typeof data.plan === 'object') {
                     // Display as calendar
                     calendarGrid.innerHTML = '';
                     const plan = data.plan;
-                    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                     
-                    days.forEach(day => {
-                        if (plan[day]) {
-                            const dayCard = document.createElement('div');
-                            const isRest = plan[day].activity.toLowerCase().includes('rest');
-                            dayCard.className = 'calendar-day' + (isRest ? ' rest-day' : '');
-                            
-                            // Create elements safely to prevent XSS
-                            const header = document.createElement('div');
-                            header.className = 'calendar-day-header';
-                            header.textContent = day;
-                            dayCard.appendChild(header);
-                            
-                            const activity = document.createElement('div');
-                            activity.className = 'calendar-activity';
-                            activity.textContent = plan[day].activity;
-                            dayCard.appendChild(activity);
-                            
-                            if (plan[day].notes) {
-                                const notes = document.createElement('div');
-                                notes.className = 'calendar-notes';
-                                notes.textContent = plan[day].notes;
-                                dayCard.appendChild(notes);
-                            }
-                            
-                            if (plan[day].weather) {
-                                const weather = document.createElement('div');
-                                weather.className = 'calendar-weather';
-                                weather.textContent = '☁️ ' + plan[day].weather;
-                                dayCard.appendChild(weather);
-                            }
-                            
-                            calendarGrid.appendChild(dayCard);
+                    // Sort by date keys to ensure proper order
+                    const dateKeys = Object.keys(plan).sort();
+                    
+                    dateKeys.forEach(dateKey => {
+                        const dayData = plan[dateKey];
+                        const dayCard = document.createElement('div');
+                        const isRest = (dayData.activity || '').toLowerCase().includes('rest');
+                        dayCard.className = 'calendar-day' + (isRest ? ' rest-day' : '');
+                        
+                        // Create elements safely to prevent XSS
+                        const header = document.createElement('div');
+                        header.className = 'calendar-day-header';
+                        header.textContent = dayData.day_name || dateKey;
+                        dayCard.appendChild(header);
+                        
+                        const activity = document.createElement('div');
+                        activity.className = 'calendar-activity';
+                        activity.textContent = dayData.activity || 'No activity';
+                        dayCard.appendChild(activity);
+                        
+                        if (dayData.notes) {
+                            const notes = document.createElement('div');
+                            notes.className = 'calendar-notes';
+                            notes.textContent = dayData.notes;
+                            dayCard.appendChild(notes);
                         }
+                        
+                        if (dayData.weather) {
+                            const weather = document.createElement('div');
+                            weather.className = 'calendar-weather';
+                            weather.textContent = '☁️ ' + dayData.weather;
+                            dayCard.appendChild(weather);
+                        }
+                        
+                        calendarGrid.appendChild(dayCard);
                     });
                     
                     calendarContainer.style.display = 'block';
@@ -305,5 +372,80 @@
             loading.style.display = 'none';
         }
     });
+
+    // Location autocomplete
+    const locationInput = document.getElementById('location');
+    const dropdown = document.getElementById('location-dropdown');
+    let searchTimeout;
+
+    locationInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/search_cities?q=${encodeURIComponent(query)}`);
+                const cities = await response.json();
+                
+                if (cities.length > 0) {
+                    dropdown.innerHTML = cities.map(city => 
+                        `<div class="autocomplete-item" data-city="${city.name}">${city.display}</div>`
+                    ).join('');
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('City search error:', error);
+                dropdown.style.display = 'none';
+            }
+        }, 300);
+    });
+
+    dropdown.addEventListener('click', function(e) {
+        if (e.target.classList.contains('autocomplete-item')) {
+            locationInput.value = e.target.dataset.city;
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target !== locationInput && e.target !== dropdown) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Temperature unit toggle
+    const toggleTempBtn = document.getElementById('toggle-temp');
+    if (toggleTempBtn) {
+        toggleTempBtn.addEventListener('click', async function() {
+            try {
+                const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
+                const response = await fetch('/toggle_temperature_unit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    // Reload page to show new temperatures
+                    window.location.reload();
+                } else {
+                    console.error('Temperature toggle failed:', data);
+                }
+            } catch (error) {
+                console.error('Temperature toggle error:', error);
+            }
+        });
+    }
 </script>
 {% endblock %}

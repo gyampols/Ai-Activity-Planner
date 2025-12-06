@@ -5,7 +5,9 @@ An intelligent Flask-based web application that creates personalized weekly acti
 ## Features
 
 ### 🔐 User Authentication
-- Secure signup and login system
+- Secure signup and login system with username/password
+- **Google OAuth integration** - Sign in with Google account
+- Option to connect Google account to existing username/password account
 - Password hashing with Werkzeug
 - Session management with Flask-Login
 
@@ -20,7 +22,8 @@ An intelligent Flask-based web application that creates personalized weekly acti
 - View all your logged activities
 
 ### 🌤️ Weather Integration
-- Enter your location (city/area)
+- **Automatic location detection** based on your IP address
+- **Smart city search** with autocomplete dropdown
 - Automatic 7-day weather forecast using Open-Meteo API
 - Temperature and precipitation forecasts
 - Weather-aware activity scheduling
@@ -34,7 +37,7 @@ An intelligent Flask-based web application that creates personalized weekly acti
   - High readiness (>80): Higher intensity activities
 
 ### 🤖 AI-Powered Weekly Planning
-- OpenAI ChatGPT integration for intelligent scheduling
+- **OpenAI GPT-4** integration for intelligent scheduling
 - Creates balanced weekly activity plans considering:
   - Your logged activities and preferences
   - Current weather forecast
@@ -55,11 +58,11 @@ An intelligent Flask-based web application that creates personalized weekly acti
 
 ## Technology Stack
 
-- **Backend**: Flask 3.0.0, Python 3.9+
+- **Backend**: Flask 3.0.0, Python 3.14+
 - **Database**: SQLAlchemy with SQLite (upgradeable to PostgreSQL/MySQL)
-- **Authentication**: Flask-Login with secure password hashing
-- **AI**: OpenAI GPT-3.5-turbo API
-- **Weather**: Open-Meteo API (free, no key required)
+- **Authentication**: Flask-Login with secure password hashing + Google OAuth 2.0
+- **AI**: OpenAI GPT-4 API
+- **Weather & Geolocation**: Open-Meteo API and ipapi.co (free, no keys required)
 - **Frontend**: Jinja2 templates, modern CSS, vanilla JavaScript
 - **Deployment**: Google App Engine ready
 
@@ -95,7 +98,19 @@ cp .env.example .env
 # Edit .env and add your configuration:
 # - SECRET_KEY: Generate a random secret key
 # - OPENAI_API_KEY: Your OpenAI API key (optional, will use mock data without it)
+# - GOOGLE_CLIENT_ID: Google OAuth client ID (optional, for Google sign-in)
+# - GOOGLE_CLIENT_SECRET: Google OAuth client secret (optional)
 ```
+
+**Setting up Google OAuth (optional):**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
+5. Set authorized redirect URIs:
+   - `http://localhost:5000/callback/google`
+   - `http://localhost:5000/callback/connect-google`
+6. Copy Client ID and Client Secret to your `.env` file
 
 5. **Run the application**
 ```bash
@@ -114,12 +129,13 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on deploying to:
 
 ## Usage Guide
 
-1. **Sign Up**: Create an account with username, email, and password
+1. **Sign Up**: Create an account with username/email/password OR sign in with Google
 2. **Log Activities**: Add activities you enjoy with all relevant details
-3. **Set Location**: Enter your city/location for weather forecasting
-4. **Connect Tracker**: (Optional) Connect Fitbit or Oura for readiness data
-5. **Generate Plan**: Click the AI planning button to create your weekly schedule
-6. **View Calendar**: See your personalized week on the interactive calendar
+3. **Set Location**: Your location is auto-detected, or search for a different city
+4. **Connect Accounts**: (Optional) Connect Google account for fitness data access
+5. **Connect Tracker**: (Optional) Connect Fitbit or Oura for readiness data
+6. **Generate Plan**: Click the AI planning button to create your weekly schedule
+7. **View Calendar**: See your personalized week on the interactive calendar
 
 ## Project Structure
 
@@ -146,9 +162,12 @@ Ai-Activity-Planner/
 
 - **OpenAI API**: Optional - get from https://platform.openai.com/
   - Without key: Uses mock planning responses
-  - With key: Full AI-powered planning
-- **Weather API**: No key required - uses free Open-Meteo service
-- **Fitness Trackers**: Currently mock implementation
+  - With key: Full GPT-4 powered planning
+- **Google OAuth**: Optional - get from https://console.cloud.google.com/
+  - Without: Users can only sign up with username/password
+  - With: Users can sign in with Google and access fitness data
+- **Weather & Geolocation APIs**: No keys required - uses free services
+- **Fitness Trackers**: Currently mock implementation (will use Google Fit API when connected)
 
 ## Contributing
 
