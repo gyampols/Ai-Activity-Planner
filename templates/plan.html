@@ -243,36 +243,61 @@
                             const isRest = plan[day].activity.toLowerCase().includes('rest');
                             dayCard.className = 'calendar-day' + (isRest ? ' rest-day' : '');
                             
-                            let html = `
-                                <div class="calendar-day-header">${day}</div>
-                                <div class="calendar-activity">${plan[day].activity}</div>
-                            `;
+                            // Create elements safely to prevent XSS
+                            const header = document.createElement('div');
+                            header.className = 'calendar-day-header';
+                            header.textContent = day;
+                            dayCard.appendChild(header);
+                            
+                            const activity = document.createElement('div');
+                            activity.className = 'calendar-activity';
+                            activity.textContent = plan[day].activity;
+                            dayCard.appendChild(activity);
                             
                             if (plan[day].notes) {
-                                html += `<div class="calendar-notes">${plan[day].notes}</div>`;
+                                const notes = document.createElement('div');
+                                notes.className = 'calendar-notes';
+                                notes.textContent = plan[day].notes;
+                                dayCard.appendChild(notes);
                             }
                             
                             if (plan[day].weather) {
-                                html += `<div class="calendar-weather">☁️ ${plan[day].weather}</div>`;
+                                const weather = document.createElement('div');
+                                weather.className = 'calendar-weather';
+                                weather.textContent = '☁️ ' + plan[day].weather;
+                                dayCard.appendChild(weather);
                             }
                             
-                            dayCard.innerHTML = html;
                             calendarGrid.appendChild(dayCard);
                         }
                     });
                     
                     calendarContainer.style.display = 'block';
                 } else {
-                    // Display as text (fallback)
-                    calendarGrid.innerHTML = '<div style="grid-column: 1/-1; padding: 1rem; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap;">' + data.plan + '</div>';
+                    // Display as text (fallback) - use textContent to prevent XSS
+                    const fallbackDiv = document.createElement('div');
+                    fallbackDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap;';
+                    fallbackDiv.textContent = data.plan;
+                    calendarGrid.innerHTML = '';
+                    calendarGrid.appendChild(fallbackDiv);
                     calendarContainer.style.display = 'block';
                 }
             } else {
-                calendarGrid.innerHTML = '<div style="grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;">Error: ' + (data.error || 'Failed to generate plan') + '</div>';
+                // Display error - use textContent to prevent XSS
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;';
+                errorDiv.textContent = 'Error: ' + (data.error || 'Failed to generate plan');
+                calendarGrid.innerHTML = '';
+                calendarGrid.appendChild(errorDiv);
                 calendarContainer.style.display = 'block';
             }
         } catch (error) {
-            calendarGrid.innerHTML = '<div style="grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;">Error: ' + error.message + '</div>';
+            // Display error - use textContent to prevent XSS
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8d7da; border-radius: 4px; color: #721c24;';
+            errorDiv.textContent = 'Error: ' + error.message;
+            calendarGrid.innerHTML = '';
+            calendarGrid.appendChild(errorDiv);
             calendarContainer.style.display = 'block';
         } finally {
             btn.disabled = false;

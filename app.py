@@ -1,11 +1,15 @@
 import os
+import json
+import random
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
 from models import db, User, Activity
 from dotenv import load_dotenv
 import openai
 import requests
 from datetime import datetime, timedelta
+from urllib.parse import quote, urlparse, urljoin
 
 load_dotenv()
 
@@ -13,9 +17,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///activities.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['WTF_CSRF_TIME_LIMIT'] = None  # No timeout for CSRF tokens
 
 # Initialize extensions
 db.init_app(app)
+csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -33,8 +40,9 @@ def get_weather_forecast(location):
     """Fetch 7-day weather forecast for the given location."""
     # Using Open-Meteo API (free, no API key required)
     try:
-        # First, geocode the location
-        geocode_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=en&format=json"
+        # First, geocode the location - properly encode the location parameter
+        encoded_location = quote(location)
+        geocode_url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded_location}&count=1&language=en&format=json"
         geo_response = requests.get(geocode_url, timeout=5)
         geo_data = geo_response.json()
         
@@ -88,22 +96,34 @@ def log():
 @app.route('/add_activity', methods=['POST'])
 @login_required
 def add_activity():
-    name = request.form.get('name')
-    location = request.form.get('location')
-    duration = request.form.get('duration')
-    intensity = request.form.get('intensity')
-    dependencies = request.form.get('dependencies')
-    description = request.form.get('description')
+    name = request.form.get('name', '').strip()
+    location = request.form.get('location', '').strip()
+    duration = request.form.get('duration', '').strip()
+    intensity = request.form.get('intensity', '').strip()
+    dependencies = request.form.get('dependencies', '').strip()
+    description = request.form.get('description', '').strip()
     
     if name:
+        # Safely convert duration to integer
+        duration_minutes = None
+        if duration:
+            try:
+                duration_minutes = int(duration)
+                if duration_minutes < 1:
+                    flash('Duration must be a positive number!', 'error')
+                    return redirect(url_for('log'))
+            except ValueError:
+                flash('Duration must be a valid number!', 'error')
+                return redirect(url_for('log'))
+        
         activity = Activity(
             user_id=current_user.id,
-            name=name,
-            location=location,
-            duration_minutes=int(duration) if duration else None,
-            intensity=intensity,
-            dependencies=dependencies,
-            description=description
+            name=name[:100],  # Limit length
+            location=location[:200] if location else None,
+            duration_minutes=duration_minutes,
+            intensity=intensity if intensity in ['Low', 'Medium', 'High'] else None,
+            dependencies=dependencies[:500] if dependencies else None,
+            description=description[:1000] if description else None
         )
         db.session.add(activity)
         db.session.commit()
@@ -143,6 +163,7 @@ def plan():
 
 @app.route('/generate_plan', methods=['POST'])
 @login_required
+@csrf.exempt  # AJAX endpoint - CSRF handled via same-origin policy
 def generate_plan():
     activities = Activity.query.filter_by(user_id=current_user.id).all()
     
@@ -279,7 +300,6 @@ Please provide a day-by-day plan in the following JSON format for easy calendar 
 @app.route('/connect_fitbit', methods=['POST'])
 @login_required
 def connect_fitbit():
-    import random
     current_user.fitbit_connected = True
     current_user.fitbit_readiness_score = random.randint(65, 95)  # Mock readiness score
     db.session.commit()
@@ -289,12 +309,17 @@ def connect_fitbit():
 @app.route('/connect_oura', methods=['POST'])
 @login_required
 def connect_oura():
-    import random
     current_user.oura_connected = True
     current_user.oura_readiness_score = random.randint(65, 95)  # Mock readiness score
     db.session.commit()
     flash(f'Oura connected successfully! Current readiness: {current_user.oura_readiness_score}/100 (Mock data)', 'success')
     return redirect(url_for('log'))
+
+def is_safe_url(target):
+    """Check if the target URL is safe for redirects."""
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -302,15 +327,22 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        if not username or not password:
+            flash('Username and password are required!', 'error')
+            return render_template('login.html')
+        
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
             login_user(user)
             flash('Logged in successfully!', 'success')
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('index'))
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            return redirect(url_for('index'))
         else:
             flash('Invalid username or password', 'error')
     
@@ -322,15 +354,35 @@ def signup():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validate username
+        if not username or len(username) < 3 or len(username) > 80:
+            flash('Username must be between 3 and 80 characters!', 'error')
+            return render_template('signup.html')
+        
+        if not username.replace('_', '').replace('-', '').isalnum():
+            flash('Username can only contain letters, numbers, hyphens, and underscores!', 'error')
+            return render_template('signup.html')
+        
+        # Validate email
+        if not email or '@' not in email or len(email) > 120:
+            flash('Please provide a valid email address!', 'error')
+            return render_template('signup.html')
+        
+        # Validate password
+        if not password or len(password) < 6:
+            flash('Password must be at least 6 characters long!', 'error')
+            return render_template('signup.html')
         
         if password != confirm_password:
             flash('Passwords do not match!', 'error')
             return render_template('signup.html')
         
+        # Check for existing user
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
             flash('Username already exists!', 'error')
@@ -341,6 +393,7 @@ def signup():
             flash('Email already registered!', 'error')
             return render_template('signup.html')
         
+        # Create user
         user = User(username=username, email=email)
         user.set_password(password)
         db.session.add(user)
