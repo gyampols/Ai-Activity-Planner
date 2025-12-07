@@ -21,17 +21,19 @@ from config import config
 integrations_bp = Blueprint('integrations', __name__)
 
 
-@integrations_bp.route('/connect_fitbit', methods=['POST'])
+@integrations_bp.route('/connect_fitbit', methods=['GET', 'POST'])
 @login_required
 def connect_fitbit():
     """Initiate Fitbit OAuth flow."""
     if not config.FITBIT_CLIENT_ID or not config.FITBIT_CLIENT_SECRET:
         # Fallback to mock data if Fitbit OAuth not configured
         current_user.fitbit_connected = True
-        current_user.fitbit_readiness_score = random.randint(65, 95)
+        # Generate more realistic mock scores (30-70 range for variety)
+        current_user.fitbit_readiness_score = random.randint(30, 70)
+        current_user.fitbit_sleep_score = random.randint(35, 75)
         db.session.commit()
-        flash(f'Fitbit connected (Mock data)! Current readiness: {current_user.fitbit_readiness_score}/100', 'success')
-        return redirect(url_for('activities.log'))
+        flash(f'Fitbit connected (Mock data)! Readiness: {current_user.fitbit_readiness_score}/100, Sleep: {current_user.fitbit_sleep_score}/100', 'success')
+        return redirect(request.referrer or url_for('activities.log'))
     
     # Real Fitbit OAuth flow
     auth_url = "https://www.fitbit.com/oauth2/authorize"
@@ -305,7 +307,7 @@ def connect_oura():
     return redirect(url_for('activities.log'))
 
 
-@integrations_bp.route('/disconnect_google', methods=['POST'])
+@integrations_bp.route('/disconnect_google', methods=['GET', 'POST'])
 @login_required
 def disconnect_google():
     """Disconnect Google account from user."""
@@ -317,10 +319,10 @@ def disconnect_google():
         flash('Google account disconnected successfully!', 'success')
     else:
         flash('No Google account connected.', 'info')
-    return redirect(url_for('activities.log'))
+    return redirect(request.referrer or url_for('activities.log'))
 
 
-@integrations_bp.route('/disconnect_fitbit', methods=['POST'])
+@integrations_bp.route('/disconnect_fitbit', methods=['GET', 'POST'])
 @login_required
 def disconnect_fitbit():
     """Disconnect Fitbit from user."""
@@ -333,10 +335,10 @@ def disconnect_fitbit():
         flash('Fitbit disconnected successfully!', 'success')
     else:
         flash('No Fitbit account connected.', 'info')
-    return redirect(url_for('activities.log'))
+    return redirect(request.referrer or url_for('activities.log'))
 
 
-@integrations_bp.route('/disconnect_oura', methods=['POST'])
+@integrations_bp.route('/disconnect_oura', methods=['GET', 'POST'])
 @login_required
 def disconnect_oura():
     """Disconnect Oura ring from user."""
@@ -347,4 +349,4 @@ def disconnect_oura():
         flash('Oura disconnected successfully!', 'success')
     else:
         flash('No Oura account connected.', 'info')
-    return redirect(url_for('activities.log'))
+    return redirect(request.referrer or url_for('activities.log'))
