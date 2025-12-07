@@ -345,7 +345,8 @@ def export_to_google_calendar():
             refresh_token=current_user.google_refresh_token,
             token_uri='https://oauth2.googleapis.com/token',
             client_id=config.GOOGLE_CLIENT_ID,
-            client_secret=config.GOOGLE_CLIENT_SECRET
+            client_secret=config.GOOGLE_CLIENT_SECRET,
+            scopes=config.GOOGLE_SCOPES  # Add scopes so the API knows what permissions we have
         )
         
         # Refresh token if expired
