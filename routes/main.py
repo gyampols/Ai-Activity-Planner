@@ -44,3 +44,20 @@ def toggle_temperature_unit():
     current_user.temperature_unit = new_unit
     db.session.commit()
     return jsonify({'unit': new_unit})
+
+
+@main_bp.route('/version')
+def version():
+    """Show current version info to verify deployment."""
+    import os
+    return jsonify({
+        'version': '2.0-modular',
+        'features': [
+            'Modular architecture with blueprints',
+            'Fixed checkbox alignment', 
+            'Repeating appointments',
+            'CircleCI auto-deployment'
+        ],
+        'deployed': True,
+        'environment': 'production' if not os.environ.get('FLASK_DEBUG') else 'development'
+    })
