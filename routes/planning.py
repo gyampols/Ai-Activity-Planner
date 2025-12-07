@@ -359,6 +359,10 @@ def export_to_google_calendar():
             except Exception as e:
                 return jsonify({'error': f'Failed to refresh access token. Please reconnect your Google account. Error: {str(e)}'}), 401
         
+        # Check if token has calendar scope
+        if creds.scopes and 'https://www.googleapis.com/auth/calendar.events' not in creds.scopes:
+            return jsonify({'error': 'Calendar permission not granted. Please disconnect and reconnect your Google account, ensuring you approve calendar access.'}), 403
+        
         # Build Calendar API service
         try:
             service = build('calendar', 'v3', credentials=creds)
@@ -372,7 +376,9 @@ def export_to_google_calendar():
             timezone = calendar.get('timeZone', 'UTC')
         except HttpError as e:
             if e.resp.status == 403:
-                return jsonify({'error': 'Calendar access denied. Please reconnect your Google account and grant calendar permissions.'}), 403
+                return jsonify({'error': 'Calendar access denied. Please disconnect and reconnect your Google account, ensuring you approve calendar access on the Google consent screen.'}), 403
+            elif e.resp.status == 401:
+                return jsonify({'error': 'Authorization expired. Please disconnect and reconnect your Google account.'}), 401
             print(f"Error getting calendar timezone: {e}")
         except Exception as e:
             print(f"Error getting calendar timezone: {e}")

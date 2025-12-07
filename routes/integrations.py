@@ -312,11 +312,28 @@ def connect_oura():
 def disconnect_google():
     """Disconnect Google account from user."""
     if current_user.google_id:
+        # Try to revoke the token with Google
+        if current_user.google_token:
+            try:
+                # Parse token if it's JSON
+                import json
+                if current_user.google_token.startswith('{'):
+                    token_data = json.loads(current_user.google_token)
+                    access_token = token_data.get('access_token') or token_data.get('token')
+                else:
+                    access_token = current_user.google_token
+                
+                # Revoke the token
+                revoke_url = f'https://oauth2.googleapis.com/revoke?token={access_token}'
+                requests.post(revoke_url, timeout=5)
+            except Exception as e:
+                print(f"Error revoking Google token: {e}")
+        
         current_user.google_id = None
         current_user.google_token = None
         current_user.google_refresh_token = None
         db.session.commit()
-        flash('Google account disconnected successfully!', 'success')
+        flash('Google account disconnected successfully! Please reconnect to grant calendar permissions.', 'success')
     else:
         flash('No Google account connected.', 'info')
     return redirect(request.referrer or url_for('activities.log'))
