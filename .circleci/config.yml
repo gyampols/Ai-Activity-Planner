@@ -101,6 +101,13 @@ jobs:
             gcloud config set project $PROJECT_ID
       
       - run:
+          name: Enable required APIs
+          command: |
+            echo "Enabling Cloud Run and Cloud Build APIs..."
+            gcloud services enable run.googleapis.com cloudbuild.googleapis.com --quiet
+            echo "✓ APIs enabled successfully"
+      
+      - run:
           name: Deploy to Cloud Run
           command: |
             gcloud run deploy ai-activity-planner \
