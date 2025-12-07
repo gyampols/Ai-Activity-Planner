@@ -1,0 +1,41 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+
+# Don't upload local Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Don't upload local environment
+.env
+venv/
+env/
+ENV/
+
+# Don't upload local database
+instance/*.db
+*.db
+*.sqlite
+
+# Don't upload git and IDE files
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Don't upload documentation and scripts
+*.md
+*.sh
+.circleci/
+
+# Don't upload old backup file (keep new app.py)
+app_old.py
+
+# Don't upload service account keys
+gcloud-service-key*.txt
+*.json
+!app.json
