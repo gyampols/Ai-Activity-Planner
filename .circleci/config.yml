@@ -1,9 +1,5 @@
 version: 2.1
 
-# Define orbs for easier integration
-orbs:
-  gcp-cli: circleci/gcp-cli@3.1.0
-
 # Define jobs
 jobs:
   test:
@@ -50,12 +46,15 @@ jobs:
 
   deploy:
     docker:
-      - image: cimg/python:3.11
+      - image: google/cloud-sdk:latest
     steps:
       - checkout
       
-      - gcp-cli/setup:
-          version: "latest"
+      - run:
+          name: Install Python dependencies for decoding
+          command: |
+            apt-get update && apt-get install -y python3-pip
+            pip3 install --upgrade pip
       
       - run:
           name: Authenticate with Google Cloud
