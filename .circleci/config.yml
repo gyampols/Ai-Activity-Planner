@@ -99,13 +99,7 @@ jobs:
             # Authenticate
             gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
             gcloud config set project $PROJECT_ID
-      
-      - run:
-          name: Enable required APIs
-          command: |
-            echo "Enabling Cloud Run and Cloud Build APIs..."
-            gcloud services enable run.googleapis.com cloudbuild.googleapis.com --quiet
-            echo "✓ APIs enabled successfully"
+            echo "✓ Authentication complete"
       
       - run:
           name: Deploy to Cloud Run
