@@ -60,25 +60,8 @@ jobs:
       - run:
           name: Authenticate with Google Cloud
           command: |
-            # Check if GCLOUD_SERVICE_KEY is set
-            if [ -z "$GCLOUD_SERVICE_KEY" ]; then
-              echo "ERROR: GCLOUD_SERVICE_KEY environment variable is not set!"
-              exit 1
-            fi
-            
-            # Debug: Show length of the key (not the actual key)
-            echo "GCLOUD_SERVICE_KEY length: ${#GCLOUD_SERVICE_KEY}"
-            
-            # Decode the service account key from environment variable
-            # Use printf instead of echo to avoid any shell interpretation
-            printf '%s' "$GCLOUD_SERVICE_KEY" | base64 -d > ${HOME}/gcloud-service-key.json
-            
-            # Check if file was created and has content
-            if [ ! -s ${HOME}/gcloud-service-key.json ]; then
-              echo "ERROR: Decoded service account key is empty!"
-              echo "First 100 chars of base64 string: ${GCLOUD_SERVICE_KEY:0:100}"
-              exit 1
-            fi
+            # Decode service account key using Python script
+            python3 decode_service_key.py
             
             # Verify the JSON is valid
             if ! python3 -m json.tool ${HOME}/gcloud-service-key.json > /dev/null 2>&1; then
@@ -89,7 +72,7 @@ jobs:
               exit 1
             fi
             
-            echo "✓ Service account key decoded and validated successfully"
+            echo "✓ Service account key validated successfully"
             
             # Authenticate
             gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
