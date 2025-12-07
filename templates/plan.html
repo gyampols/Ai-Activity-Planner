@@ -501,13 +501,15 @@
                 
                 const data = await response.json();
                 
-                if (response.ok) {
-                    alert('Calendar exported successfully! Check your Google Calendar.');
+                if (response.ok && data.success) {
+                    alert('✅ ' + data.message + '\n\nCheck your Google Calendar to see the events.');
+                } else if (response.status === 403) {
+                    alert('⚠️ ' + (data.error || 'Calendar access denied') + '\n\nTip: You may need to disconnect and reconnect your Google account to grant calendar permissions.');
                 } else {
-                    alert('Export failed: ' + (data.error || 'Unknown error'));
+                    alert('❌ Export failed: ' + (data.error || data.message || 'Unknown error'));
                 }
             } catch (error) {
-                alert('Export error: ' + error.message);
+                alert('❌ Export error: ' + error.message + '\n\nPlease try again or reconnect your Google account.');
             } finally {
                 btn.disabled = false;
                 btn.textContent = '📅 Export to Google Calendar';

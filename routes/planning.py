@@ -313,12 +313,13 @@ def _generate_mock_plan(activities, now, weather_forecast):
 def export_to_google_calendar():
     """Export the generated plan to Google Calendar."""
     if not current_user.google_token:
-        return jsonify({'error': 'Google account not connected'}), 403
+        return jsonify({'error': 'Google account not connected. Please connect your Google account first.'}), 403
     
     try:
-        from google.oauth2.credentials import Credentials
         from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
         import pytz
+        import json
         
         request_data = request.get_json() or {}
         plan = request_data.get('plan', {})
@@ -326,25 +327,55 @@ def export_to_google_calendar():
         if not plan:
             return jsonify({'error': 'No plan data provided'}), 400
         
-        # Create credentials from stored token
+        # Try to parse the token as JSON (in case it's stored as a JSON string)
+        try:
+            if current_user.google_token.startswith('{'):
+                token_data = json.loads(current_user.google_token)
+                access_token = token_data.get('access_token') or token_data.get('token')
+            else:
+                access_token = current_user.google_token
+        except:
+            access_token = current_user.google_token
+        
+        # Create credentials using google-auth-httplib2 for simpler token handling
+        from google.oauth2.credentials import Credentials
+        
         creds = Credentials(
-            token=current_user.google_token,
+            token=access_token,
             refresh_token=current_user.google_refresh_token,
             token_uri='https://oauth2.googleapis.com/token',
             client_id=config.GOOGLE_CLIENT_ID,
             client_secret=config.GOOGLE_CLIENT_SECRET
         )
         
+        # Refresh token if expired
+        if creds.expired and creds.refresh_token:
+            try:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                # Update stored token
+                current_user.google_token = creds.token
+                db.session.commit()
+            except Exception as e:
+                return jsonify({'error': f'Failed to refresh access token. Please reconnect your Google account. Error: {str(e)}'}), 401
+        
         # Build Calendar API service
-        service = build('calendar', 'v3', credentials=creds)
+        try:
+            service = build('calendar', 'v3', credentials=creds)
+        except Exception as e:
+            return jsonify({'error': f'Failed to connect to Google Calendar API. Please reconnect your Google account. Error: {str(e)}'}), 500
         
         # Get user's timezone (default to UTC if not available)
         timezone = 'UTC'
         try:
             calendar = service.calendars().get(calendarId='primary').execute()
             timezone = calendar.get('timeZone', 'UTC')
-        except:
-            pass
+        except HttpError as e:
+            if e.resp.status == 403:
+                return jsonify({'error': 'Calendar access denied. Please reconnect your Google account and grant calendar permissions.'}), 403
+            print(f"Error getting calendar timezone: {e}")
+        except Exception as e:
+            print(f"Error getting calendar timezone: {e}")
         
         tz = pytz.timezone(timezone)
         events_created = 0
@@ -395,10 +426,23 @@ def export_to_google_calendar():
                 print(f"Error creating event for {date_key}: {e}")
                 continue
         
+        if events_created == 0:
+            return jsonify({
+                'success': False,
+                'message': 'No events were created. Your plan may only contain rest days.'
+            }), 200
+        
         return jsonify({
             'success': True,
-            'message': f'Successfully created {events_created} calendar events'
+            'message': f'Successfully created {events_created} calendar event{"s" if events_created != 1 else ""}!'
         })
         
+    except HttpError as e:
+        if e.resp.status == 403:
+            return jsonify({'error': 'Calendar access denied. Please disconnect and reconnect your Google account to grant calendar permissions.'}), 403
+        return jsonify({'error': f'Google Calendar API error: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'error': f'Failed to export to calendar: {str(e)}'}), 500
+        import traceback
+        print(f"Export error: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Failed to export to calendar: {str(e)}. Please try reconnecting your Google account.'}), 500
