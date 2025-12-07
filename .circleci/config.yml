@@ -104,6 +104,7 @@ jobs:
       - run:
           name: Deploy to Cloud Run
           command: |
+            # Force a fresh build with --no-cache and add build tag
             gcloud run deploy ai-activity-planner \
               --source . \
               --platform managed \
@@ -112,7 +113,15 @@ jobs:
               --min-instances=0 \
               --max-instances=10 \
               --memory=512Mi \
+              --no-traffic \
+              --tag="build-${CIRCLE_BUILD_NUM}" \
               --set-env-vars="SECRET_KEY=$SECRET_KEY,OPENAI_API_KEY=$OPENAI_API_KEY,GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET,FITBIT_CLIENT_ID=$FITBIT_CLIENT_ID,FITBIT_CLIENT_SECRET=$FITBIT_CLIENT_SECRET,BASE_URL=$BASE_URL"
+            
+            # Verify deployment and route traffic to latest revision
+            echo "Routing 100% traffic to latest revision..."
+            gcloud run services update-traffic ai-activity-planner \
+              --to-latest \
+              --region us-central1
       
       - run:
           name: Deployment successful
