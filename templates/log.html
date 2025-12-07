@@ -116,27 +116,34 @@
         
         <div class="form-group">
             <label for="preferred_days">Preferred Days of Week</label>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem;">
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Monday" style="margin: 0;"> <span>Monday</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 0.5rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Monday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Monday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Tuesday" style="margin: 0;"> <span>Tuesday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Tuesday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Tuesday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Wednesday" style="margin: 0;"> <span>Wednesday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Wednesday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Wednesday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Thursday" style="margin: 0;"> <span>Thursday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Thursday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Thursday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Friday" style="margin: 0;"> <span>Friday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Friday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Friday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Saturday" style="margin: 0;"> <span>Saturday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Saturday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Saturday</span>
                 </label>
-                <label style="display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" name="preferred_days" value="Sunday" style="margin: 0;"> <span>Sunday</span>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="preferred_days" value="Sunday" style="width: auto; margin-right: 0.5rem;">
+                    <span>Sunday</span>
                 </label>
             </div>
         </div>
@@ -228,6 +235,46 @@
         </div>
         
         <div class="form-group">
+            <label>Repeating Days (optional)</label>
+            <div style="margin-bottom: 0.75rem;">
+                <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectAppointmentDays('all')">All Days</button>
+                <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectAppointmentDays('weekdays')">Weekdays</button>
+                <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectAppointmentDays('weekends')">Weekends</button>
+                <button type="button" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;" onclick="selectAppointmentDays('none')">Clear</button>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Monday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Monday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Tuesday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Tuesday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Wednesday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Wednesday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Thursday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Thursday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Friday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Friday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Saturday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Saturday</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="repeating_days" value="Sunday" class="appointment-day-checkbox" style="width: auto; margin-right: 0.5rem;">
+                    <span>Sunday</span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-group">
             <label for="appointment_description">Description</label>
             <textarea id="appointment_description" name="description" placeholder="Additional details..."></textarea>
         </div>
@@ -251,6 +298,9 @@
                     {% if appointment.duration_minutes %}
                         <p><strong>Duration:</strong> {{ appointment.duration_minutes }} minutes</p>
                     {% endif %}
+                    {% if appointment.repeating_days %}
+                        <p><strong>Repeats on:</strong> {{ appointment.repeating_days }}</p>
+                    {% endif %}
                     {% if appointment.description %}
                         <p><strong>Description:</strong> {{ appointment.description }}</p>
                     {% endif %}
@@ -265,4 +315,26 @@
         <p style="margin-top: 1rem; color: #666;">No appointments scheduled yet. Add your first appointment above!</p>
     {% endif %}
 </div>
+
+<script>
+function selectAppointmentDays(selection) {
+    const checkboxes = document.querySelectorAll('.appointment-day-checkbox');
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const weekends = ['Saturday', 'Sunday'];
+    
+    checkboxes.forEach(checkbox => {
+        const day = checkbox.value;
+        
+        if (selection === 'all') {
+            checkbox.checked = true;
+        } else if (selection === 'weekdays') {
+            checkbox.checked = weekdays.includes(day);
+        } else if (selection === 'weekends') {
+            checkbox.checked = weekends.includes(day);
+        } else if (selection === 'none') {
+            checkbox.checked = false;
+        }
+    });
+}
+</script>
 {% endblock %}
