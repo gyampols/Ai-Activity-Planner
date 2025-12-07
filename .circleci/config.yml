@@ -60,13 +60,38 @@ jobs:
       - run:
           name: Authenticate with Google Cloud
           command: |
+            # Check if environment variable exists
+            if [ -z "$GCLOUD_SERVICE_KEY" ]; then
+              echo "ERROR: GCLOUD_SERVICE_KEY is not set in CircleCI context!"
+              echo "Please check: Organization Settings -> Contexts -> gcp-deployment"
+              exit 1
+            fi
+            
+            # Show debug info
+            echo "Environment variable length: ${#GCLOUD_SERVICE_KEY}"
+            echo "First 100 chars: ${GCLOUD_SERVICE_KEY:0:100}"
+            
             # Decode service account key using Python script
             python3 decode_service_key.py
+            
+            # Check if file exists
+            if [ ! -f ${HOME}/gcloud-service-key.json ]; then
+              echo "ERROR: Service account key file was not created!"
+              exit 1
+            fi
+            
+            # Check file size
+            FILE_SIZE=$(wc -c < ${HOME}/gcloud-service-key.json)
+            echo "Decoded file size: $FILE_SIZE bytes"
+            
+            if [ "$FILE_SIZE" -eq 0 ]; then
+              echo "ERROR: Decoded service account key is empty!"
+              exit 1
+            fi
             
             # Verify the JSON is valid
             if ! python3 -m json.tool ${HOME}/gcloud-service-key.json > /dev/null 2>&1; then
               echo "ERROR: Decoded service account key is not valid JSON!"
-              echo "File size: $(wc -c < ${HOME}/gcloud-service-key.json) bytes"
               echo "First 200 chars of decoded content:"
               head -c 200 ${HOME}/gcloud-service-key.json
               exit 1
