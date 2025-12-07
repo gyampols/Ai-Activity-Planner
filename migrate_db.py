@@ -12,11 +12,14 @@ from pathlib import Path
 def migrate_database():
     """Add new columns to the User table."""
     # Find database file
-    db_path = Path('instance/ai_planner.db')
+    db_path = Path('instance/activities.db')
     
     if not db_path.exists():
-        print("Database not found. It will be created automatically when the app runs.")
-        return
+        # Try alternative name
+        db_path = Path('instance/ai_planner.db')
+        if not db_path.exists():
+            print("Database not found. It will be created automatically when the app runs.")
+            return
     
     print(f"Migrating database at {db_path}...")
     
