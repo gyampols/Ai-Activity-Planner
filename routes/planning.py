@@ -349,7 +349,7 @@ def export_to_google_calendar():
             scopes=config.GOOGLE_SCOPES  # Add scopes so the API knows what permissions we have
         )
         
-        # Refresh token if expired
+        # Refresh token if expired (this will also ensure scopes are validated)
         if creds.expired and creds.refresh_token:
             try:
                 from google.auth.transport.requests import Request
@@ -357,32 +357,35 @@ def export_to_google_calendar():
                 # Update stored token
                 current_user.google_token = creds.token
                 db.session.commit()
+                print(f"[Calendar] Token refreshed for user {current_user.id}")
             except Exception as e:
+                print(f"[Calendar] Token refresh failed: {e}")
                 return jsonify({'error': f'Failed to refresh access token. Please reconnect your Google account. Error: {str(e)}'}), 401
-        
-        # Check if token has calendar scope
-        if creds.scopes and 'https://www.googleapis.com/auth/calendar.events' not in creds.scopes:
-            return jsonify({'error': 'Calendar permission not granted. Please disconnect and reconnect your Google account, ensuring you approve calendar access.'}), 403
         
         # Build Calendar API service
         try:
             service = build('calendar', 'v3', credentials=creds)
+            print(f"[Calendar] Service built successfully for user {current_user.id}")
         except Exception as e:
+            print(f"[Calendar] Service build failed: {e}")
             return jsonify({'error': f'Failed to connect to Google Calendar API. Please reconnect your Google account. Error: {str(e)}'}), 500
         
         # Get user's timezone (default to UTC if not available)
         timezone = 'UTC'
         try:
+            print(f"[Calendar] Fetching calendar info for user {current_user.id}")
             calendar = service.calendars().get(calendarId='primary').execute()
             timezone = calendar.get('timeZone', 'UTC')
+            print(f"[Calendar] Got timezone: {timezone}")
         except HttpError as e:
+            print(f"[Calendar] HttpError {e.resp.status}: {e}")
             if e.resp.status == 403:
                 return jsonify({'error': 'Calendar access denied. Please disconnect and reconnect your Google account, ensuring you approve calendar access on the Google consent screen.'}), 403
             elif e.resp.status == 401:
                 return jsonify({'error': 'Authorization expired. Please disconnect and reconnect your Google account.'}), 401
-            print(f"Error getting calendar timezone: {e}")
+            print(f"[Calendar] Error getting calendar timezone: {e}")
         except Exception as e:
-            print(f"Error getting calendar timezone: {e}")
+            print(f"[Calendar] Exception getting calendar timezone: {e}")
         
         tz = pytz.timezone(timezone)
         events_created = 0

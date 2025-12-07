@@ -132,7 +132,7 @@
                 {% if current_user.google_id %}
                     <a href="{{ url_for('integrations.disconnect_google') }}" class="btn btn-secondary">Disconnect</a>
                 {% else %}
-                    <a href="{{ url_for('auth.google_login') }}" class="btn btn-primary">Connect</a>
+                    <a href="{{ url_for('integrations.connect_google') }}" class="btn btn-primary">Connect</a>
                 {% endif %}
             </div>
             
