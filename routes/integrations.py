@@ -106,11 +106,15 @@ def callback_fitbit():
             today = datetime.now().strftime('%Y-%m-%d')
             fitbit_headers = {'Authorization': f'Bearer {access_token}'}
             
+            print(f"[Fitbit] Fetching data for user {current_user.id} on {today}")
+            
             # Get readiness score (Premium feature)
             _fetch_fitbit_readiness(fitbit_headers, today)
+            print(f"[Fitbit] Readiness score: {current_user.fitbit_readiness_score}")
             
             # Get sleep score (available to all users)
             _fetch_fitbit_sleep(fitbit_headers, today)
+            print(f"[Fitbit] Sleep score: {current_user.fitbit_sleep_score}")
             
             db.session.commit()
             session.pop('fitbit_state', None)
@@ -137,8 +141,11 @@ def _fetch_fitbit_readiness(fitbit_headers, today):
         readiness_url = f"https://api.fitbit.com/1/user/-/activities/readiness/date/{today}.json"
         readiness_response = requests.get(readiness_url, headers=fitbit_headers, timeout=10)
         
+        print(f"[Fitbit] Readiness API status: {readiness_response.status_code}")
+        
         if readiness_response.status_code == 200:
             readiness_data = readiness_response.json()
+            print(f"[Fitbit] Readiness data: {readiness_data}")
             if 'score' in readiness_data:
                 current_user.fitbit_readiness_score = int(readiness_data['score'])
             elif 'value' in readiness_data:
@@ -146,9 +153,10 @@ def _fetch_fitbit_readiness(fitbit_headers, today):
             else:
                 current_user.fitbit_readiness_score = None
         else:
+            print(f"[Fitbit] Readiness API error: {readiness_response.text}")
             current_user.fitbit_readiness_score = None
     except Exception as e:
-        print(f"Fitbit readiness fetch error: {e}")
+        print(f"[Fitbit] Readiness fetch error: {e}")
         current_user.fitbit_readiness_score = None
 
 
@@ -158,8 +166,11 @@ def _fetch_fitbit_sleep(fitbit_headers, today):
         sleep_url = f"https://api.fitbit.com/1.2/user/-/sleep/date/{today}.json"
         sleep_response = requests.get(sleep_url, headers=fitbit_headers, timeout=10)
         
+        print(f"[Fitbit] Sleep API status: {sleep_response.status_code}")
+        
         if sleep_response.status_code == 200:
             sleep_data = sleep_response.json()
+            print(f"[Fitbit] Sleep data summary: {sleep_data.get('summary', {})}")
             
             if sleep_data.get('sleep') and len(sleep_data['sleep']) > 0:
                 sleep_log = sleep_data['sleep'][0]
