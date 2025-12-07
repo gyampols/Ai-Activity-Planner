@@ -1,0 +1,106 @@
+version: 2.1
+
+# Define orbs for easier integration
+orbs:
+  gcp-cli: circleci/gcp-cli@3.1.0
+
+# Define jobs
+jobs:
+  test:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}
+            - v1-dependencies-
+      
+      - run:
+          name: Install dependencies
+          command: |
+            python -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+      
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}
+      
+      - run:
+          name: Run basic validation
+          command: |
+            . venv/bin/activate
+            # Check if app.py has syntax errors
+            python -m py_compile app.py
+            python -m py_compile models.py
+            python -m py_compile config.py
+            # Check routes
+            python -m py_compile routes/auth.py
+            python -m py_compile routes/activities.py
+            python -m py_compile routes/planning.py
+            python -m py_compile routes/integrations.py
+            python -m py_compile routes/main.py
+            # Check utils
+            python -m py_compile utils/helpers.py
+            echo "All Python files compiled successfully!"
+
+  deploy:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      
+      - gcp-cli/setup:
+          version: "latest"
+      
+      - run:
+          name: Authenticate with Google Cloud
+          command: |
+            # Decode the service account key from environment variable
+            echo $GCLOUD_SERVICE_KEY | base64 -d > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+            gcloud config set project $GOOGLE_PROJECT_ID
+      
+      - run:
+          name: Deploy to Cloud Run
+          command: |
+            gcloud run deploy ai-activity-planner \
+              --source . \
+              --platform managed \
+              --region us-central1 \
+              --allow-unauthenticated \
+              --min-instances=0 \
+              --max-instances=10 \
+              --memory=512Mi \
+              --set-env-vars="SECRET_KEY=$SECRET_KEY,OPENAI_API_KEY=$OPENAI_API_KEY,GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET,FITBIT_CLIENT_ID=$FITBIT_CLIENT_ID,FITBIT_CLIENT_SECRET=$FITBIT_CLIENT_SECRET,BASE_URL=$BASE_URL"
+      
+      - run:
+          name: Deployment successful
+          command: |
+            echo "Deployment completed successfully!"
+            echo "Application URL: https://ai-activity-planner-mola55j5ra-uc.a.run.app"
+
+# Define workflows
+workflows:
+  version: 2
+  test-and-deploy:
+    jobs:
+      - test:
+          filters:
+            branches:
+              ignore:
+                - /^dependabot.*/
+      
+      - deploy:
+          requires:
+            - test
+          filters:
+            branches:
+              only:
+                - main
+          context:
+            - gcp-deployment

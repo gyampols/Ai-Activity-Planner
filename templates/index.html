@@ -12,14 +12,14 @@
     
     {% if not current_user.is_authenticated %}
     <div style="margin-top: 2rem;">
-        <a href="{{ url_for('signup') }}" class="btn btn-primary" style="margin-right: 1rem;">Get Started</a>
-        <a href="{{ url_for('login') }}" class="btn btn-success">Login</a>
+        <a href="{{ url_for('auth.signup') }}" class="btn btn-primary" style="margin-right: 1rem;">Get Started</a>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-success">Login</a>
     </div>
     {% else %}
     <div style="margin-top: 2rem;">
         <p>Welcome back, {{ current_user.username }}!</p>
-        <a href="{{ url_for('log') }}" class="btn btn-primary" style="margin-right: 1rem;">Manage Activities</a>
-        <a href="{{ url_for('plan') }}" class="btn btn-success">Generate Plan</a>
+        <a href="{{ url_for('activities.log') }}" class="btn btn-primary" style="margin-right: 1rem;">Manage Activities</a>
+        <a href="{{ url_for('planning.plan') }}" class="btn btn-success">Generate Plan</a>
     </div>
     {% endif %}
 </div>
