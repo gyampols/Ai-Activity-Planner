@@ -32,16 +32,22 @@ The CircleCI pipeline consists of two jobs:
 
 ## Step 2: Encode the Service Account Key
 
-The service account key needs to be base64 encoded for CircleCI:
+The service account key needs to be base64 encoded for CircleCI. **IMPORTANT**: Encode without line breaks!
 
 ```bash
-# On macOS/Linux
-cat path/to/your-service-account-key.json | base64 | pbcopy
-# This copies the encoded key to your clipboard
+# On macOS/Linux (RECOMMENDED - encodes without newlines)
+cat path/to/your-service-account-key.json | base64 | tr -d '\n' | pbcopy
+# This copies the encoded key to your clipboard WITHOUT newlines
+
+# Alternative: Save to a file first
+cat path/to/your-service-account-key.json | base64 | tr -d '\n' > encoded-key.txt
+# Then copy the contents of encoded-key.txt
 
 # On Windows (PowerShell)
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("path\to\your-service-account-key.json")) | Set-Clipboard
 ```
+
+**⚠️ Critical**: Make sure there are NO newlines or spaces in your base64 string when pasting into CircleCI!
 
 ## Step 3: Set Up CircleCI Project
 
@@ -153,13 +159,25 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
   --role="roles/run.admin"
 ```
 
-### Issue: "Unable to decode GCLOUD_SERVICE_KEY"
+### Issue: "Unable to decode GCLOUD_SERVICE_KEY" or "Expecting value: line 2 column 1"
 
-**Solution**: Re-encode your service account key:
+**Problem**: The base64-encoded service account key has newlines or is corrupted.
+
+**Solution**: Re-encode your service account key WITHOUT newlines:
 ```bash
-cat service-account-key.json | base64 | tr -d '\n'
+# Remove the old environment variable from CircleCI first
+# Then re-encode properly:
+cat service-account-key.json | base64 | tr -d '\n' > encoded-key.txt
+# Copy contents of encoded-key.txt (it should be ONE long line with no breaks)
+cat encoded-key.txt
 ```
-Copy the output without any line breaks.
+
+**Steps to fix in CircleCI**:
+1. Go to Organization Settings → Contexts → `gcp-deployment`
+2. Click on `GCLOUD_SERVICE_KEY` environment variable
+3. Click **Remove Environment Variable**
+4. Add it again with the newly encoded value (no newlines!)
+5. Re-run the failed pipeline
 
 ### Issue: Build fails with "context not found"
 
