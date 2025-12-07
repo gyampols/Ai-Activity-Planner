@@ -60,42 +60,8 @@ jobs:
       - run:
           name: Authenticate with Google Cloud
           command: |
-            # Check if GCLOUD_SERVICE_KEY is set
-            if [ -z "$GCLOUD_SERVICE_KEY" ]; then
-              echo "ERROR: GCLOUD_SERVICE_KEY environment variable is not set!"
-              exit 1
-            fi
-            
-            # Debug: Show length of the key (not the actual key)
-            echo "GCLOUD_SERVICE_KEY length: ${#GCLOUD_SERVICE_KEY}"
-            echo "First 50 chars: ${GCLOUD_SERVICE_KEY:0:50}"
-            
-            # Decode using Python base64 (more reliable across platforms)
-            python3 << 'EOF'
-import base64
-import os
-import sys
-
-try:
-    # Get the base64 encoded key from environment
-    encoded_key = os.environ.get('GCLOUD_SERVICE_KEY', '')
-    if not encoded_key:
-        print("ERROR: GCLOUD_SERVICE_KEY is empty")
-        sys.exit(1)
-    
-    # Decode the base64 string
-    decoded_json = base64.b64decode(encoded_key)
-    
-    # Write to file
-    with open('/home/circleci/gcloud-service-key.json', 'wb') as f:
-        f.write(decoded_json)
-    
-    print(f"✓ Decoded {len(decoded_json)} bytes successfully")
-    
-except Exception as e:
-    print(f"ERROR: Failed to decode service account key: {e}")
-    sys.exit(1)
-EOF
+            # Decode service account key using Python script
+            python3 decode_service_key.py
             
             # Verify the JSON is valid
             if ! python3 -m json.tool ${HOME}/gcloud-service-key.json > /dev/null 2>&1; then
