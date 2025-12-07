@@ -7,3 +7,9 @@ venv/
 env/
 .DS_Store
 *.log
+
+# Service account keys (DO NOT COMMIT!)
+*service-account*.json
+*gcloud-service-key*.json
+*gcloud-service-key*.txt
+gcloud-service-key-encoded.txt
