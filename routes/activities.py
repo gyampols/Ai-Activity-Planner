@@ -98,6 +98,7 @@ def add_appointment():
     time_str = request.form.get('time', '').strip()
     duration = request.form.get('duration_minutes', '').strip()
     description = request.form.get('description', '').strip()
+    repeating_days = request.form.getlist('repeating_days')
     
     if not title or not date_str:
         flash('Title and date are required!', 'error')
@@ -131,6 +132,9 @@ def add_appointment():
             flash('Duration must be a valid number!', 'error')
             return redirect(url_for('activities.log'))
     
+    # Join repeating days with comma
+    repeating_days_str = ','.join(repeating_days) if repeating_days else None
+    
     appointment = Appointment(
         user_id=current_user.id,
         title=title[:200],
@@ -138,7 +142,8 @@ def add_appointment():
         date=appointment_date,
         time=appointment_time,
         duration_minutes=duration_minutes,
-        description=description[:1000] if description else None
+        description=description[:1000] if description else None,
+        repeating_days=repeating_days_str
     )
     
     db.session.add(appointment)

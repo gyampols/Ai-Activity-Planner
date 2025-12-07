@@ -60,4 +60,5 @@ class Appointment(db.Model):
     time = db.Column(db.Time)  # Optional time
     duration_minutes = db.Column(db.Integer)  # Optional duration
     appointment_type = db.Column(db.String(50))  # Work, School, Doctor, Plans, Other
+    repeating_days = db.Column(db.String(200))  # Comma-separated days (e.g., "Monday,Wednesday,Friday")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
