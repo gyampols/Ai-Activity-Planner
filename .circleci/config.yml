@@ -61,7 +61,12 @@ jobs:
           name: Authenticate with Google Cloud
           command: |
             # Decode the service account key from environment variable
-            echo $GCLOUD_SERVICE_KEY | base64 -d > ${HOME}/gcloud-service-key.json
+            # Remove any whitespace/newlines before decoding
+            echo "$GCLOUD_SERVICE_KEY" | tr -d '\n' | base64 -d > ${HOME}/gcloud-service-key.json
+            # Verify the JSON is valid
+            cat ${HOME}/gcloud-service-key.json | python3 -m json.tool > /dev/null
+            echo "Service account key decoded successfully"
+            # Authenticate
             gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
             gcloud config set project $GOOGLE_PROJECT_ID
       
