@@ -51,12 +51,6 @@ jobs:
       - checkout
       
       - run:
-          name: Install Python dependencies for decoding
-          command: |
-            apt-get update && apt-get install -y python3-pip
-            pip3 install --upgrade pip
-      
-      - run:
           name: Authenticate with Google Cloud
           command: |
             # Check if environment variable exists
