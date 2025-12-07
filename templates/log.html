@@ -11,7 +11,7 @@
     
     <div style="margin-bottom: 1rem;">
         {% if not current_user.google_id %}
-        <a href="{{ url_for('connect_google') }}" class="btn" style="background: #4285f4; color: white; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+        <a href="{{ url_for('integrations.connect_google') }}" class="btn" style="background: #4285f4; color: white; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
             <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -24,7 +24,7 @@
         {% else %}
         <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
             <button class="btn btn-primary" disabled>✓ Google Connected</button>
-            <form method="POST" action="{{ url_for('disconnect_google') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect your Google account?');">
+            <form method="POST" action="{{ url_for('integrations.disconnect_google') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect your Google account?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
             </form>
@@ -38,13 +38,13 @@
         <!-- Fitbit Connection -->
         <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-right: 1rem; margin-bottom: 0.5rem;">
             {% if not current_user.fitbit_connected %}
-            <form method="POST" action="{{ url_for('connect_fitbit') }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('integrations.connect_fitbit') }}" style="display: inline;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn btn-primary">Connect Fitbit</button>
             </form>
             {% else %}
             <button class="btn btn-primary" disabled>✓ Fitbit Connected</button>
-            <form method="POST" action="{{ url_for('disconnect_fitbit') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Fitbit?');">
+            <form method="POST" action="{{ url_for('integrations.disconnect_fitbit') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Fitbit?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
             </form>
@@ -54,13 +54,13 @@
         <!-- Oura Connection -->
         <div style="display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
             {% if not current_user.oura_connected %}
-            <form method="POST" action="{{ url_for('connect_oura') }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('integrations.connect_oura') }}" style="display: inline;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn btn-primary">Connect Oura</button>
             </form>
             {% else %}
             <button class="btn btn-primary" disabled>✓ Oura Connected</button>
-            <form method="POST" action="{{ url_for('disconnect_oura') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Oura?');">
+            <form method="POST" action="{{ url_for('integrations.disconnect_oura') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect Oura?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
             </form>
@@ -71,7 +71,7 @@
 
 <div class="card">
     <h2>Add New Activity</h2>
-    <form method="POST" action="{{ url_for('add_activity') }}">
+    <form method="POST" action="{{ url_for('activities.add_activity') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="form-group">
             <label for="name">Activity Name *</label>
@@ -178,7 +178,7 @@
                     {% if activity.description %}
                         <p><strong>Description:</strong> {{ activity.description }}</p>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('delete_activity', activity_id=activity.id) }}" style="margin-top: 1rem;">
+                    <form method="POST" action="{{ url_for('activities.delete_activity', activity_id=activity.id) }}" style="margin-top: 1rem;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
                     </form>
@@ -192,7 +192,7 @@
 
 <div class="card">
     <h2>Add Appointment/Responsibility</h2>
-    <form method="POST" action="{{ url_for('add_appointment') }}">
+    <form method="POST" action="{{ url_for('activities.add_appointment') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="form-group">
             <label for="title">Title *</label>
@@ -254,7 +254,7 @@
                     {% if appointment.description %}
                         <p><strong>Description:</strong> {{ appointment.description }}</p>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('delete_appointment', appointment_id=appointment.id) }}" style="margin-top: 1rem;">
+                    <form method="POST" action="{{ url_for('activities.delete_appointment', appointment_id=appointment.id) }}" style="margin-top: 1rem;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this appointment?')">Delete</button>
                     </form>

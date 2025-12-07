@@ -1,6 +1,7 @@
 # AI Activity Planner 🏃‍♂️🤖
 
 An intelligent Flask-based web application that creates personalized weekly activity plans using AI, weather data, and fitness tracker insights.
+Go to [ai activity planner web app](https://ai-activity-planner-mola55j5ra-uc.a.run.app)
 
 ## Features
 
@@ -123,9 +124,19 @@ Open your browser and navigate to `http://localhost:5000`
 ## Deployment
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on deploying to:
+- Google Cloud Run (recommended)
 - Google App Engine
 - Other cloud platforms
 - Production best practices
+
+### 🚀 Continuous Deployment with CircleCI
+
+This project includes automatic deployment to Google Cloud Run via CircleCI:
+- **Test Job**: Validates Python syntax on every push
+- **Deploy Job**: Auto-deploys to Cloud Run when changes are merged to `main` branch
+- **Zero-Downtime**: Cloud Run handles traffic switching automatically
+
+See [CIRCLECI_SETUP.md](CIRCLECI_SETUP.md) for complete setup instructions.
 
 ## Usage Guide
 
@@ -141,22 +152,37 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on deploying to:
 
 ```
 Ai-Activity-Planner/
-├── app.py                 # Main Flask application
-├── models.py             # Database models (User, Activity)
-├── requirements.txt      # Python dependencies
-├── app.yaml             # Google App Engine configuration
-├── .env.example         # Environment variables template
-├── DEPLOYMENT.md        # Deployment guide
-├── templates/           # HTML templates
-│   ├── base.html       # Base template with navigation
-│   ├── index.html      # Home page
-│   ├── about.html      # About page
-│   ├── login.html      # Login page
-│   ├── signup.html     # Signup page
-│   ├── log.html        # Activity logging page
-│   └── plan.html       # Planning and calendar page
-└── static/             # Static files (CSS, JS, images)
+├── app.py                    # Application factory and initialization
+├── config.py                 # Configuration management
+├── models.py                 # Database models (User, Activity, Appointment)
+├── requirements.txt          # Python dependencies
+├── app.yaml                  # Google App Engine configuration
+├── .env.example              # Environment variables template
+├── DEPLOYMENT.md             # Deployment guide
+├── CIRCLECI_SETUP.md         # CircleCI CI/CD setup guide
+├── CODE_STRUCTURE.md         # Detailed architecture documentation
+├── .circleci/
+│   └── config.yml            # CircleCI pipeline configuration
+├── routes/                   # Blueprint modules (modular architecture)
+│   ├── auth.py               # Authentication and OAuth flows
+│   ├── activities.py         # Activity & appointment CRUD
+│   ├── planning.py           # AI-powered planning logic
+│   ├── integrations.py       # Third-party integrations (Fitbit, Google, Oura)
+│   └── main.py               # Basic pages and utilities
+├── utils/
+│   └── helpers.py            # Reusable utility functions (weather, geolocation)
+├── templates/                # HTML templates
+│   ├── base.html             # Base template with navigation
+│   ├── index.html            # Home page
+│   ├── about.html            # About page
+│   ├── login.html            # Login page
+│   ├── signup.html           # Signup page
+│   ├── log.html              # Activity logging page
+│   └── plan.html             # Planning and calendar page
+└── static/                   # Static files (CSS, JS, images)
 ```
+
+For detailed architecture documentation, see [CODE_STRUCTURE.md](CODE_STRUCTURE.md).
 
 ## API Keys
 

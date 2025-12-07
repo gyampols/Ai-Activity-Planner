@@ -261,7 +261,7 @@
     {% else %}
         <p style="margin-top: 1rem; color: #666;">
             You haven't added any activities yet. 
-            <a href="{{ url_for('log') }}" style="color: #3498db;">Add some activities</a> 
+            <a href="{{ url_for('activities.log') }}" style="color: #3498db;">Add some activities</a> 
             to generate a plan.
         </p>
     {% endif %}
@@ -283,7 +283,7 @@
         calendarContainer.style.display = 'none';
         
         try {
-            const response = await fetch('{{ url_for("generate_plan") }}', {
+            const response = await fetch('{{ url_for("planning.generate_plan") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
