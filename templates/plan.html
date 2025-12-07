@@ -235,6 +235,11 @@
         {% endif %}
         
         <div style="margin-top: 1.5rem;">
+            <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 1rem;">
+                <input type="checkbox" id="allow-multiple-activities" style="width: auto; margin-right: 0.5rem;">
+                <span style="font-weight: 600;">Allow multiple activities per day</span>
+            </label>
+            
             <label for="extra-info" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
                 Additional Information (Optional)
             </label>
@@ -255,7 +260,18 @@
         </div>
         
         <div id="calendar-container" style="display: none; margin-top: 2rem;">
-            <h2>Your Weekly Activity Calendar</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">Your Weekly Activity Calendar</h2>
+                {% if current_user.google_id %}
+                <button id="export-calendar-btn" class="btn btn-success" style="display: none;">
+                    📅 Export to Google Calendar
+                </button>
+                {% else %}
+                <p style="margin: 0; color: #666; font-size: 0.9rem;">
+                    <a href="{{ url_for('integrations.connect_google') }}" style="color: #3498db;">Connect Google Account</a> to export to calendar
+                </p>
+                {% endif %}
+            </div>
             <div class="calendar-grid" id="calendar-grid"></div>
         </div>
     {% else %}
@@ -276,6 +292,7 @@
         const calendarContainer = document.getElementById('calendar-container');
         const calendarGrid = document.getElementById('calendar-grid');
         const extraInfo = document.getElementById('extra-info')?.value || '';
+        const allowMultiple = document.getElementById('allow-multiple-activities')?.checked || false;
         
         btn.disabled = true;
         btn.textContent = 'Generating...';
@@ -289,7 +306,8 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    extra_info: extraInfo
+                    extra_info: extraInfo,
+                    allow_multiple_activities: allowMultiple
                 })
             });
             
@@ -338,6 +356,15 @@
                         
                         calendarGrid.appendChild(dayCard);
                     });
+                    
+                    // Store plan data globally for export
+                    window.currentPlan = plan;
+                    
+                    // Show export button if Google is connected
+                    const exportBtn = document.getElementById('export-calendar-btn');
+                    if (exportBtn) {
+                        exportBtn.style.display = '{% if current_user.google_id %}inline-block{% else %}none{% endif %}';
+                    }
                     
                     calendarContainer.style.display = 'block';
                 } else {
@@ -444,6 +471,46 @@
                 }
             } catch (error) {
                 console.error('Temperature toggle error:', error);
+            }
+        });
+    }
+
+    // Export to Google Calendar
+    const exportBtn = document.getElementById('export-calendar-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async function() {
+            if (!window.currentPlan) {
+                alert('No plan to export. Please generate a plan first.');
+                return;
+            }
+            
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Exporting...';
+            
+            try {
+                const response = await fetch('{{ url_for("planning.export_to_google_calendar") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        plan: window.currentPlan
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Calendar exported successfully! Check your Google Calendar.');
+                } else {
+                    alert('Export failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Export error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📅 Export to Google Calendar';
             }
         });
     }

@@ -64,8 +64,10 @@ def generate_plan():
     try:
         request_data = request.get_json() or {}
         extra_info = request_data.get('extra_info', '').strip()
+        allow_multiple = request_data.get('allow_multiple_activities', False)
     except:
         extra_info = ''
+        allow_multiple = False
     
     # Get current date and time
     now = datetime.now()
@@ -90,7 +92,7 @@ def generate_plan():
     # Build prompt
     prompt = _build_planning_prompt(
         activities, now, current_date, current_time, 
-        weather_forecast, readiness_score, sleep_score, extra_info
+        weather_forecast, readiness_score, sleep_score, extra_info, allow_multiple
     )
     
     try:
@@ -131,7 +133,7 @@ def generate_plan():
 
 
 def _build_planning_prompt(activities, now, current_date, current_time, 
-                           weather_forecast, readiness_score, sleep_score, extra_info):
+                           weather_forecast, readiness_score, sleep_score, extra_info, allow_multiple=False):
     """Build the comprehensive prompt for OpenAI."""
     # Prepare activity information
     activity_info = []
@@ -230,6 +232,12 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
         
         prompt += "\nIMPORTANT: These scores are ONLY for today. For future days, plan activities normally based on weather and activity preferences, as we don't have readiness data for those days yet.\n"
     
+    multiple_activities_instruction = ""
+    if allow_multiple:
+        multiple_activities_instruction = "13. User wants MULTIPLE activities per day when possible - schedule 2-3 activities per day based on time availability and recovery needs\n"
+    else:
+        multiple_activities_instruction = "13. Schedule ONE activity per day maximum (unless user has specific appointments/responsibilities)\n"
+    
     prompt += f"""
 Create a balanced weekly schedule that:
 1. Distributes activities throughout the week based on weather conditions
@@ -248,6 +256,7 @@ Create a balanced weekly schedule that:
 10. Considers intensity levels to avoid overtraining across the week
 11. Takes into account dependencies (weather, equipment, location)
 12. Schedules outdoor activities on days with good weather AND sufficient daylight
+{multiple_activities_instruction}
 
 Please provide a day-by-day plan starting from today in the following JSON format for easy calendar display.
 Use the following date keys (these are the actual dates):
@@ -297,3 +306,99 @@ def _generate_mock_plan(activities, now, weather_forecast):
             }
     
     return {'plan': mock_plan, 'structured': True}
+
+
+@planning_bp.route('/export_to_google_calendar', methods=['POST'])
+@login_required
+def export_to_google_calendar():
+    """Export the generated plan to Google Calendar."""
+    if not current_user.google_token:
+        return jsonify({'error': 'Google account not connected'}), 403
+    
+    try:
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+        import pytz
+        
+        request_data = request.get_json() or {}
+        plan = request_data.get('plan', {})
+        
+        if not plan:
+            return jsonify({'error': 'No plan data provided'}), 400
+        
+        # Create credentials from stored token
+        creds = Credentials(
+            token=current_user.google_token,
+            refresh_token=current_user.google_refresh_token,
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=config.GOOGLE_CLIENT_ID,
+            client_secret=config.GOOGLE_CLIENT_SECRET
+        )
+        
+        # Build Calendar API service
+        service = build('calendar', 'v3', credentials=creds)
+        
+        # Get user's timezone (default to UTC if not available)
+        timezone = 'UTC'
+        try:
+            calendar = service.calendars().get(calendarId='primary').execute()
+            timezone = calendar.get('timeZone', 'UTC')
+        except:
+            pass
+        
+        tz = pytz.timezone(timezone)
+        events_created = 0
+        
+        # Create events for each day in the plan
+        for date_key, day_data in plan.items():
+            try:
+                # Parse the date
+                event_date = datetime.strptime(date_key, '%Y-%m-%d').date()
+                activity = day_data.get('activity', '')
+                
+                # Skip rest days
+                if 'rest' in activity.lower():
+                    continue
+                
+                # Create start and end times (default to 9 AM - 10 AM)
+                start_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=9))
+                end_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=10))
+                
+                # Localize to user's timezone
+                start_datetime = tz.localize(start_datetime)
+                end_datetime = tz.localize(end_datetime)
+                
+                # Build event description
+                description = day_data.get('notes', '')
+                if day_data.get('weather'):
+                    description += f"\n\nWeather: {day_data['weather']}"
+                
+                # Create the event
+                event = {
+                    'summary': activity,
+                    'description': description,
+                    'start': {
+                        'dateTime': start_datetime.isoformat(),
+                        'timeZone': timezone,
+                    },
+                    'end': {
+                        'dateTime': end_datetime.isoformat(),
+                        'timeZone': timezone,
+                    },
+                    'colorId': '9',  # Blue color for activities
+                }
+                
+                service.events().insert(calendarId='primary', body=event).execute()
+                events_created += 1
+                
+            except Exception as e:
+                print(f"Error creating event for {date_key}: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully created {events_created} calendar events'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to export to calendar: {str(e)}'}), 500

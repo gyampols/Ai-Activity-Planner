@@ -84,8 +84,14 @@
         </div>
         
         <div class="form-group">
-            <label for="duration">Duration (minutes)</label>
-            <input type="number" id="duration" name="duration" min="1" placeholder="e.g., 30, 60, 90">
+            <label for="duration">Duration</label>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <input type="number" id="duration" name="duration" min="1" placeholder="e.g., 30 or 1.5">
+                <select id="duration_unit" name="duration_unit">
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                </select>
+            </div>
         </div>
         
         <div class="form-group">
@@ -185,10 +191,13 @@
                     {% if activity.description %}
                         <p><strong>Description:</strong> {{ activity.description }}</p>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('activities.delete_activity', activity_id=activity.id) }}" style="margin-top: 1rem;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
-                    </form>
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-primary" onclick="openEditActivityModal({{ activity.id }}, '{{ activity.name|replace("'", "\\'") }}', '{{ activity.location or "" }}', {{ activity.duration_minutes or 0 }}, '{{ activity.intensity or "" }}', '{{ activity.dependencies|replace("'", "\\'") if activity.dependencies else "" }}', '{{ activity.description|replace("'", "\\'") if activity.description else "" }}', '{{ activity.preferred_time or "" }}', '{{ activity.preferred_days or "" }}')">Edit</button>
+                        <form method="POST" action="{{ url_for('activities.delete_activity', activity_id=activity.id) }}" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
+                        </form>
+                    </div>
                 </div>
             {% endfor %}
         </div>
@@ -230,8 +239,14 @@
         </div>
         
         <div class="form-group">
-            <label for="appointment_duration">Duration (minutes, optional)</label>
-            <input type="number" id="appointment_duration" name="duration_minutes" min="1" placeholder="e.g., 30, 60, 120">
+            <label for="appointment_duration">Duration (optional)</label>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                <input type="number" id="appointment_duration" name="duration_minutes" min="1" placeholder="e.g., 30 or 1.5">
+                <select id="appointment_duration_unit" name="duration_unit">
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                </select>
+            </div>
         </div>
         
         <div class="form-group">
@@ -304,16 +319,160 @@
                     {% if appointment.description %}
                         <p><strong>Description:</strong> {{ appointment.description }}</p>
                     {% endif %}
-                    <form method="POST" action="{{ url_for('activities.delete_appointment', appointment_id=appointment.id) }}" style="margin-top: 1rem;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this appointment?')">Delete</button>
-                    </form>
+                    <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-primary" onclick="openEditAppointmentModal({{ appointment.id }}, '{{ appointment.title|replace(\"'\", \"\\\'\") }}', '{{ appointment.appointment_type }}', '{{ appointment.date.strftime('%Y-%m-%d') }}', '{{ appointment.time.strftime('%H:%M') if appointment.time else '' }}', {{ appointment.duration_minutes or 0 }}, '{{ appointment.description|replace(\"'\", \"\\\'\") if appointment.description else '' }}', '{{ appointment.repeating_days or '' }}')">Edit</button>
+                        <form method="POST" action="{{ url_for('activities.delete_appointment', appointment_id=appointment.id) }}" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this appointment?')">Delete</button>
+                        </form>
+                    </div>
                 </div>
             {% endfor %}
         </div>
     {% else %}
         <p style="margin-top: 1rem; color: #666;">No appointments scheduled yet. Add your first appointment above!</p>
     {% endif %}
+</div>
+
+<!-- Edit Activity Modal -->
+<div id="editActivityModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+    <div style="background: white; margin: 2rem auto; padding: 2rem; max-width: 600px; border-radius: 8px;">
+        <h2>Edit Activity</h2>
+        <form id="editActivityForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="form-group">
+                <label>Activity Name *</label>
+                <input type="text" name="name" id="edit_activity_name" required>
+            </div>
+            <div class="form-group">
+                <label>Location</label>
+                <input type="text" name="location" id="edit_activity_location">
+            </div>
+            <div class="form-group">
+                <label>Duration</label>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                    <input type="number" name="duration" id="edit_activity_duration" min="1">
+                    <select name="duration_unit" id="edit_activity_duration_unit">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Intensity</label>
+                <select name="intensity" id="edit_activity_intensity">
+                    <option value="">Select intensity</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Dependencies</label>
+                <input type="text" name="dependencies" id="edit_activity_dependencies">
+            </div>
+            <div class="form-group">
+                <label>Preferred Time</label>
+                <select name="preferred_time" id="edit_activity_preferred_time">
+                    <option value="">No preference</option>
+                    <option value="Morning">Morning</option>
+                    <option value="Afternoon">Afternoon</option>
+                    <option value="Evening">Evening</option>
+                    <option value="Night">Night</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Preferred Days</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Monday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Monday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Tuesday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Tuesday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Wednesday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Wednesday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Thursday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Thursday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Friday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Friday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Saturday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Saturday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="preferred_days" value="Sunday" class="edit-activity-day" style="width: auto; margin-right: 0.5rem;">Sunday</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" id="edit_activity_description"></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                <button type="submit" class="btn btn-success">Save Changes</button>
+                <button type="button" class="btn" onclick="closeEditActivityModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Appointment Modal -->
+<div id="editAppointmentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+    <div style="background: white; margin: 2rem auto; padding: 2rem; max-width: 600px; border-radius: 8px;">
+        <h2>Edit Appointment</h2>
+        <form id="editAppointmentForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="form-group">
+                <label>Title *</label>
+                <input type="text" name="title" id="edit_appointment_title" required>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select name="appointment_type" id="edit_appointment_type">
+                    <option value="Work">Work</option>
+                    <option value="School">School</option>
+                    <option value="Doctor">Doctor/Medical</option>
+                    <option value="Plans">Plans/Social</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input type="date" name="date" id="edit_appointment_date" required>
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" name="time" id="edit_appointment_time">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Duration</label>
+                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem;">
+                    <input type="number" name="duration_minutes" id="edit_appointment_duration" min="1">
+                    <select name="duration_unit" id="edit_appointment_duration_unit">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Repeating Days</label>
+                <div style="margin-bottom: 0.75rem;">
+                    <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectEditAppointmentDays('all')">All Days</button>
+                    <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectEditAppointmentDays('weekdays')">Weekdays</button>
+                    <button type="button" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.9rem; margin-right: 0.5rem;" onclick="selectEditAppointmentDays('weekends')">Weekends</button>
+                    <button type="button" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;" onclick="selectEditAppointmentDays('none')">Clear</button>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Monday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Monday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Tuesday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Tuesday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Wednesday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Wednesday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Thursday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Thursday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Friday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Friday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Saturday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Saturday</label>
+                    <label style="display: flex; align-items: center;"><input type="checkbox" name="repeating_days" value="Sunday" class="edit-appointment-day" style="width: auto; margin-right: 0.5rem;">Sunday</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" id="edit_appointment_description"></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                <button type="submit" class="btn btn-success">Save Changes</button>
+                <button type="button" class="btn" onclick="closeEditAppointmentModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>
@@ -335,6 +494,109 @@ function selectAppointmentDays(selection) {
             checkbox.checked = false;
         }
     });
+}
+
+function openEditActivityModal(id, name, location, duration, intensity, dependencies, description, preferredTime, preferredDays) {
+    document.getElementById('editActivityForm').action = `/edit_activity/${id}`;
+    document.getElementById('edit_activity_name').value = name;
+    document.getElementById('edit_activity_location').value = location;
+    
+    // Set duration (convert from minutes)
+    if (duration > 0) {
+        if (duration >= 60 && duration % 60 === 0) {
+            document.getElementById('edit_activity_duration').value = duration / 60;
+            document.getElementById('edit_activity_duration_unit').value = 'hours';
+        } else {
+            document.getElementById('edit_activity_duration').value = duration;
+            document.getElementById('edit_activity_duration_unit').value = 'minutes';
+        }
+    } else {
+        document.getElementById('edit_activity_duration').value = '';
+    }
+    
+    document.getElementById('edit_activity_intensity').value = intensity;
+    document.getElementById('edit_activity_dependencies').value = dependencies;
+    document.getElementById('edit_activity_preferred_time').value = preferredTime;
+    document.getElementById('edit_activity_description').value = description;
+    
+    // Set preferred days checkboxes
+    const dayCheckboxes = document.querySelectorAll('.edit-activity-day');
+    const selectedDays = preferredDays.split(',').map(d => d.trim());
+    dayCheckboxes.forEach(cb => {
+        cb.checked = selectedDays.includes(cb.value);
+    });
+    
+    document.getElementById('editActivityModal').style.display = 'block';
+}
+
+function closeEditActivityModal() {
+    document.getElementById('editActivityModal').style.display = 'none';
+}
+
+function openEditAppointmentModal(id, title, type, date, time, duration, description, repeatingDays) {
+    document.getElementById('editAppointmentForm').action = `/edit_appointment/${id}`;
+    document.getElementById('edit_appointment_title').value = title;
+    document.getElementById('edit_appointment_type').value = type;
+    document.getElementById('edit_appointment_date').value = date;
+    document.getElementById('edit_appointment_time').value = time;
+    
+    // Set duration (convert from minutes)
+    if (duration > 0) {
+        if (duration >= 60 && duration % 60 === 0) {
+            document.getElementById('edit_appointment_duration').value = duration / 60;
+            document.getElementById('edit_appointment_duration_unit').value = 'hours';
+        } else {
+            document.getElementById('edit_appointment_duration').value = duration;
+            document.getElementById('edit_appointment_duration_unit').value = 'minutes';
+        }
+    } else {
+        document.getElementById('edit_appointment_duration').value = '';
+    }
+    
+    document.getElementById('edit_appointment_description').value = description;
+    
+    // Set repeating days checkboxes
+    const dayCheckboxes = document.querySelectorAll('.edit-appointment-day');
+    const selectedDays = repeatingDays.split(',').map(d => d.trim());
+    dayCheckboxes.forEach(cb => {
+        cb.checked = selectedDays.includes(cb.value);
+    });
+    
+    document.getElementById('editAppointmentModal').style.display = 'block';
+}
+
+function closeEditAppointmentModal() {
+    document.getElementById('editAppointmentModal').style.display = 'none';
+}
+
+function selectEditAppointmentDays(selection) {
+    const checkboxes = document.querySelectorAll('.edit-appointment-day');
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const weekends = ['Saturday', 'Sunday'];
+    
+    checkboxes.forEach(checkbox => {
+        const day = checkbox.value;
+        
+        if (selection === 'all') {
+            checkbox.checked = true;
+        } else if (selection === 'weekdays') {
+            checkbox.checked = weekdays.includes(day);
+        } else if (selection === 'weekends') {
+            checkbox.checked = weekends.includes(day);
+        } else if (selection === 'none') {
+            checkbox.checked = false;
+        }
+    });
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target == document.getElementById('editActivityModal')) {
+        closeEditActivityModal();
+    }
+    if (event.target == document.getElementById('editAppointmentModal')) {
+        closeEditAppointmentModal();
+    }
 }
 </script>
 {% endblock %}
