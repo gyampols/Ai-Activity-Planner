@@ -192,7 +192,17 @@
                         <p><strong>Description:</strong> {{ activity.description }}</p>
                     {% endif %}
                     <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-primary" onclick="openEditActivityModal({{ activity.id }}, '{{ activity.name|replace("'", "\\'") }}', '{{ activity.location or "" }}', {{ activity.duration_minutes or 0 }}, '{{ activity.intensity or "" }}', '{{ activity.dependencies|replace("'", "\\'") if activity.dependencies else "" }}', '{{ activity.description|replace("'", "\\'") if activity.description else "" }}', '{{ activity.preferred_time or "" }}', '{{ activity.preferred_days or "" }}')">Edit</button>
+                        <button type="button" class="btn btn-primary" 
+                                data-activity-id="{{ activity.id }}"
+                                data-activity-name="{{ activity.name }}"
+                                data-activity-location="{{ activity.location or '' }}"
+                                data-activity-duration="{{ activity.duration_minutes or 0 }}"
+                                data-activity-intensity="{{ activity.intensity or '' }}"
+                                data-activity-dependencies="{{ activity.dependencies or '' }}"
+                                data-activity-description="{{ activity.description or '' }}"
+                                data-activity-preferred-time="{{ activity.preferred_time or '' }}"
+                                data-activity-preferred-days="{{ activity.preferred_days or '' }}"
+                                onclick="openEditActivityModal(this)">Edit</button>
                         <form method="POST" action="{{ url_for('activities.delete_activity', activity_id=activity.id) }}" style="display: inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this activity?')">Delete</button>
@@ -320,7 +330,16 @@
                         <p><strong>Description:</strong> {{ appointment.description }}</p>
                     {% endif %}
                     <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                        <button type="button" class="btn btn-primary" onclick="openEditAppointmentModal({{ appointment.id }}, '{{ appointment.title|replace(\"'\", \"\\\'\") }}', '{{ appointment.appointment_type }}', '{{ appointment.date.strftime('%Y-%m-%d') }}', '{{ appointment.time.strftime('%H:%M') if appointment.time else '' }}', {{ appointment.duration_minutes or 0 }}, '{{ appointment.description|replace(\"'\", \"\\\'\") if appointment.description else '' }}', '{{ appointment.repeating_days or '' }}')">Edit</button>
+                        <button type="button" class="btn btn-primary"
+                                data-appointment-id="{{ appointment.id }}"
+                                data-appointment-title="{{ appointment.title }}"
+                                data-appointment-type="{{ appointment.appointment_type }}"
+                                data-appointment-date="{{ appointment.date.strftime('%Y-%m-%d') }}"
+                                data-appointment-time="{{ appointment.time.strftime('%H:%M') if appointment.time else '' }}"
+                                data-appointment-duration="{{ appointment.duration_minutes or 0 }}"
+                                data-appointment-description="{{ appointment.description or '' }}"
+                                data-appointment-repeating-days="{{ appointment.repeating_days or '' }}"
+                                onclick="openEditAppointmentModal(this)">Edit</button>
                         <form method="POST" action="{{ url_for('activities.delete_appointment', appointment_id=appointment.id) }}" style="display: inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this appointment?')">Delete</button>
@@ -496,7 +515,17 @@ function selectAppointmentDays(selection) {
     });
 }
 
-function openEditActivityModal(id, name, location, duration, intensity, dependencies, description, preferredTime, preferredDays) {
+function openEditActivityModal(button) {
+    const id = button.dataset.activityId;
+    const name = button.dataset.activityName;
+    const location = button.dataset.activityLocation;
+    const duration = parseInt(button.dataset.activityDuration) || 0;
+    const intensity = button.dataset.activityIntensity;
+    const dependencies = button.dataset.activityDependencies;
+    const description = button.dataset.activityDescription;
+    const preferredTime = button.dataset.activityPreferredTime;
+    const preferredDays = button.dataset.activityPreferredDays;
+    
     document.getElementById('editActivityForm').action = `/edit_activity/${id}`;
     document.getElementById('edit_activity_name').value = name;
     document.getElementById('edit_activity_location').value = location;
@@ -533,7 +562,16 @@ function closeEditActivityModal() {
     document.getElementById('editActivityModal').style.display = 'none';
 }
 
-function openEditAppointmentModal(id, title, type, date, time, duration, description, repeatingDays) {
+function openEditAppointmentModal(button) {
+    const id = button.dataset.appointmentId;
+    const title = button.dataset.appointmentTitle;
+    const type = button.dataset.appointmentType;
+    const date = button.dataset.appointmentDate;
+    const time = button.dataset.appointmentTime;
+    const duration = parseInt(button.dataset.appointmentDuration) || 0;
+    const description = button.dataset.appointmentDescription;
+    const repeatingDays = button.dataset.appointmentRepeatingDays;
+    
     document.getElementById('editAppointmentForm').action = `/edit_appointment/${id}`;
     document.getElementById('edit_appointment_title').value = title;
     document.getElementById('edit_appointment_type').value = type;
