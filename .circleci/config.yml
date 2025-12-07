@@ -92,9 +92,13 @@ jobs:
             
             echo "✓ Service account key validated successfully"
             
+            # Extract project ID from the service account JSON
+            PROJECT_ID=$(python3 -c "import json; print(json.load(open('${HOME}/gcloud-service-key.json'))['project_id'])")
+            echo "Project ID: $PROJECT_ID"
+            
             # Authenticate
             gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-            gcloud config set project $GOOGLE_PROJECT_ID
+            gcloud config set project $PROJECT_ID
       
       - run:
           name: Deploy to Cloud Run
