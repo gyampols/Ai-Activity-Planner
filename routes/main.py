@@ -52,6 +52,7 @@ def version():
     import os
     return jsonify({
         'version': '2.0-modular',
+        'build_number': os.environ.get('BUILD_NUM', 'unknown'),
         'features': [
             'Modular architecture with blueprints',
             'Fixed checkbox alignment', 
@@ -59,5 +60,6 @@ def version():
             'CircleCI auto-deployment'
         ],
         'deployed': True,
-        'environment': 'production' if not os.environ.get('FLASK_DEBUG') else 'development'
+        'environment': 'production' if not os.environ.get('FLASK_DEBUG') else 'development',
+        'app_module': __name__
     })
