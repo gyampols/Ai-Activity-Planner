@@ -18,6 +18,14 @@ class User(UserMixin, db.Model):
     google_token = db.Column(db.Text, nullable=True)
     google_refresh_token = db.Column(db.Text, nullable=True)
     
+    # User profile settings
+    full_name = db.Column(db.String(200), nullable=True)
+    age = db.Column(db.Integer, nullable=True)
+    gender = db.Column(db.String(50), nullable=True)  # Male, Female, Non-binary, Other, Prefer not to say
+    height_cm = db.Column(db.Integer, nullable=True)
+    weight_kg = db.Column(db.Float, nullable=True)
+    timezone = db.Column(db.String(100), default='UTC')
+    
     # Fitness tracker integration
     fitbit_connected = db.Column(db.Boolean, default=False)
     fitbit_readiness_score = db.Column(db.Integer)  # Fitbit readiness score from API

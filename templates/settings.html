@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}User Settings - AI Activity Planner{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>User Settings</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Profile Information -->
+    <section class="settings-section">
+        <h2>Profile Information</h2>
+        <form method="POST" action="{{ url_for('main.settings') }}" class="settings-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="full_name">Full Name</label>
+                    <input type="text" id="full_name" name="full_name" value="{{ current_user.full_name or '' }}" class="form-control" placeholder="John Doe">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ current_user.email }}" class="form-control" readonly>
+                    <small class="form-text">Email cannot be changed</small>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" value="{{ current_user.username }}" class="form-control" readonly>
+                    <small class="form-text">Username cannot be changed</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" name="location" value="{{ current_user.location or '' }}" class="form-control" placeholder="San Francisco, CA">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" value="{{ current_user.age or '' }}" class="form-control" min="13" max="120" placeholder="25">
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender" class="form-control">
+                        <option value="">Prefer not to say</option>
+                        <option value="Male" {% if current_user.gender == 'Male' %}selected{% endif %}>Male</option>
+                        <option value="Female" {% if current_user.gender == 'Female' %}selected{% endif %}>Female</option>
+                        <option value="Non-binary" {% if current_user.gender == 'Non-binary' %}selected{% endif %}>Non-binary</option>
+                        <option value="Other" {% if current_user.gender == 'Other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="height_cm">Height (cm)</label>
+                    <input type="number" id="height_cm" name="height_cm" value="{{ current_user.height_cm or '' }}" class="form-control" min="50" max="300" placeholder="175">
+                </div>
+                
+                <div class="form-group">
+                    <label for="weight_kg">Weight (kg)</label>
+                    <input type="number" id="weight_kg" name="weight_kg" value="{{ current_user.weight_kg or '' }}" class="form-control" min="20" max="500" step="0.1" placeholder="70.5">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="timezone">Timezone</label>
+                    <select id="timezone" name="timezone" class="form-control">
+                        <option value="UTC" {% if current_user.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                        <option value="America/New_York" {% if current_user.timezone == 'America/New_York' %}selected{% endif %}>Eastern Time (ET)</option>
+                        <option value="America/Chicago" {% if current_user.timezone == 'America/Chicago' %}selected{% endif %}>Central Time (CT)</option>
+                        <option value="America/Denver" {% if current_user.timezone == 'America/Denver' %}selected{% endif %}>Mountain Time (MT)</option>
+                        <option value="America/Los_Angeles" {% if current_user.timezone == 'America/Los_Angeles' %}selected{% endif %}>Pacific Time (PT)</option>
+                        <option value="America/Anchorage" {% if current_user.timezone == 'America/Anchorage' %}selected{% endif %}>Alaska Time (AKT)</option>
+                        <option value="Pacific/Honolulu" {% if current_user.timezone == 'Pacific/Honolulu' %}selected{% endif %}>Hawaii Time (HT)</option>
+                        <option value="Europe/London" {% if current_user.timezone == 'Europe/London' %}selected{% endif %}>London (GMT)</option>
+                        <option value="Europe/Paris" {% if current_user.timezone == 'Europe/Paris' %}selected{% endif %}>Paris (CET)</option>
+                        <option value="Asia/Tokyo" {% if current_user.timezone == 'Asia/Tokyo' %}selected{% endif %}>Tokyo (JST)</option>
+                        <option value="Australia/Sydney" {% if current_user.timezone == 'Australia/Sydney' %}selected{% endif %}>Sydney (AEST)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="temperature_unit">Temperature Unit</label>
+                    <select id="temperature_unit" name="temperature_unit" class="form-control">
+                        <option value="C" {% if current_user.temperature_unit == 'C' %}selected{% endif %}>Celsius (°C)</option>
+                        <option value="F" {% if current_user.temperature_unit == 'F' %}selected{% endif %}>Fahrenheit (°F)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Save Profile</button>
+        </form>
+    </section>
+    
+    <!-- Connected Accounts -->
+    <section class="settings-section">
+        <h2>Connected Accounts</h2>
+        <div class="connected-accounts">
+            <div class="account-card">
+                <div class="account-info">
+                    <h3>
+                        <svg class="account-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
+                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        </svg>
+                        Google
+                    </h3>
+                    <p class="account-status">
+                        {% if current_user.google_id %}
+                            <span class="status-connected">✓ Connected</span> - Access to Calendar & Google Fit
+                        {% else %}
+                            <span class="status-disconnected">✗ Not Connected</span>
+                        {% endif %}
+                    </p>
+                </div>
+                {% if current_user.google_id %}
+                    <a href="{{ url_for('integrations.disconnect_google') }}" class="btn btn-secondary">Disconnect</a>
+                {% else %}
+                    <a href="{{ url_for('auth.google_login') }}" class="btn btn-primary">Connect</a>
+                {% endif %}
+            </div>
+            
+            <div class="account-card">
+                <div class="account-info">
+                    <h3>
+                        <svg class="account-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#00B0B9">
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        Fitbit
+                    </h3>
+                    <p class="account-status">
+                        {% if current_user.fitbit_connected %}
+                            <span class="status-connected">✓ Connected</span> - Access to activity & sleep data
+                        {% else %}
+                            <span class="status-disconnected">✗ Not Connected</span>
+                        {% endif %}
+                    </p>
+                </div>
+                {% if current_user.fitbit_connected %}
+                    <a href="{{ url_for('integrations.disconnect_fitbit') }}" class="btn btn-secondary">Disconnect</a>
+                {% else %}
+                    <a href="{{ url_for('integrations.connect_fitbit') }}" class="btn btn-primary">Connect</a>
+                {% endif %}
+            </div>
+            
+            <div class="account-card">
+                <div class="account-info">
+                    <h3>
+                        <svg class="account-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#FF6C00">
+                            <circle cx="12" cy="12" r="8"/>
+                        </svg>
+                        Oura
+                    </h3>
+                    <p class="account-status">
+                        {% if current_user.oura_connected %}
+                            <span class="status-connected">✓ Connected</span> - Access to sleep & readiness data
+                        {% else %}
+                            <span class="status-disconnected">✗ Not Connected</span>
+                        {% endif %}
+                    </p>
+                </div>
+                {% if current_user.oura_connected %}
+                    <a href="{{ url_for('integrations.disconnect_oura') }}" class="btn btn-secondary">Disconnect</a>
+                {% else %}
+                    <a href="{{ url_for('integrations.connect_oura') }}" class="btn btn-primary">Connect</a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    
+    <!-- Account Actions -->
+    <section class="settings-section danger-zone">
+        <h2>Danger Zone</h2>
+        <div class="danger-content">
+            <div>
+                <h3>Delete Account</h3>
+                <p>Permanently delete your account and all associated data. This action cannot be undone.</p>
+            </div>
+            <button type="button" class="btn btn-danger" onclick="confirmDeleteAccount()">Delete Account</button>
+        </div>
+    </section>
+</div>
+
+<!-- Delete Account Confirmation Modal -->
+<div id="deleteAccountModal" class="modal">
+    <div class="modal-content">
+        <h2>Delete Account</h2>
+        <p>Are you sure you want to delete your account? This will permanently delete:</p>
+        <ul>
+            <li>All your activities and appointments</li>
+            <li>All connected OAuth services</li>
+            <li>Your profile information</li>
+            <li>All saved data</li>
+        </ul>
+        <p><strong>This action cannot be undone.</strong></p>
+        <form method="POST" action="{{ url_for('main.delete_account') }}">
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteAccountModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">Yes, Delete My Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .settings-section {
+        margin-bottom: 3rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .settings-section:last-child {
+        border-bottom: none;
+    }
+    
+    .settings-section h2 {
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
+        font-size: 1.5rem;
+    }
+    
+    .settings-form {
+        max-width: 800px;
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .form-group label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #34495e;
+    }
+    
+    .form-control {
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    
+    .form-control:read-only {
+        background-color: #f8f9fa;
+        cursor: not-allowed;
+    }
+    
+    .form-text {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    /* Connected Accounts */
+    .connected-accounts {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 800px;
+    }
+    
+    .account-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #f8f9fa;
+    }
+    
+    .account-info h3 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0 0 0.5rem 0;
+        color: #2c3e50;
+        font-size: 1.125rem;
+    }
+    
+    .account-icon {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .account-status {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .status-connected {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .status-disconnected {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    
+    /* Danger Zone */
+    .danger-zone {
+        background: #fff5f5;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 1px solid #fc8181;
+    }
+    
+    .danger-zone h2 {
+        color: #c53030;
+    }
+    
+    .danger-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 2rem;
+    }
+    
+    @media (max-width: 768px) {
+        .danger-content {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+    
+    .danger-content h3 {
+        margin: 0 0 0.5rem 0;
+        color: #2c3e50;
+    }
+    
+    .danger-content p {
+        margin: 0;
+        color: #6c757d;
+    }
+    
+    /* Buttons */
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        transition: background-color 0.2s;
+    }
+    
+    .btn-primary {
+        background-color: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background-color: #2980b9;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+    
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal.show {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+    }
+    
+    .modal-content h2 {
+        margin-top: 0;
+        color: #c53030;
+    }
+    
+    .modal-content ul {
+        margin-left: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+</style>
+
+<script>
+    function confirmDeleteAccount() {
+        document.getElementById('deleteAccountModal').classList.add('show');
+    }
+    
+    function closeDeleteAccountModal() {
+        document.getElementById('deleteAccountModal').classList.remove('show');
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('deleteAccountModal');
+        if (event.target === modal) {
+            closeDeleteAccountModal();
+        }
+    }
+</script>
+{% endblock %}
