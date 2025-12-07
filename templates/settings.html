@@ -18,6 +18,7 @@
     <section class="settings-section">
         <h2>Profile Information</h2>
         <form method="POST" action="{{ url_for('main.settings') }}" class="settings-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-row">
                 <div class="form-group">
                     <label for="full_name">Full Name</label>
@@ -209,6 +210,7 @@
         </ul>
         <p><strong>This action cannot be undone.</strong></p>
         <form method="POST" action="{{ url_for('main.delete_account') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="modal-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeDeleteAccountModal()">Cancel</button>
                 <button type="submit" class="btn btn-danger">Yes, Delete My Account</button>
