@@ -434,15 +434,22 @@ def export_to_google_calendar():
         tz = pytz.timezone(timezone)
         events_created = 0
         
+        print(f"[Calendar] Processing plan with {len(plan)} days")
+        print(f"[Calendar] Plan keys: {list(plan.keys())}")
+        
         # Create events for each day in the plan
         for date_key, day_data in plan.items():
             try:
+                print(f"[Calendar] Processing day: {date_key}, data: {day_data}")
                 # Parse the date
                 event_date = datetime.strptime(date_key, '%Y-%m-%d').date()
                 activity = day_data.get('activity', '')
                 
+                print(f"[Calendar] Activity for {date_key}: '{activity}'")
+                
                 # Skip rest days
                 if 'rest' in activity.lower():
+                    print(f"[Calendar] Skipping rest day: {date_key}")
                     continue
                 
                 # Create start and end times (default to 9 AM - 10 AM)
@@ -475,12 +482,16 @@ def export_to_google_calendar():
                 
                 service.events().insert(calendarId='primary', body=event).execute()
                 events_created += 1
+                print(f"[Calendar] Created event for {date_key}: {activity}")
                 
             except Exception as e:
-                print(f"Error creating event for {date_key}: {e}")
+                print(f"[Calendar] Error creating event for {date_key}: {e}")
                 continue
         
+        print(f"[Calendar] Total events created: {events_created}")
+        
         if events_created == 0:
+            print(f"[Calendar] No events created - returning error")
             return jsonify({
                 'success': False,
                 'message': 'No events were created. Your plan may only contain rest days.'
