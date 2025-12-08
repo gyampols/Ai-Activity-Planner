@@ -301,6 +301,54 @@
             <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 4px;">
                 <strong>Oura Readiness:</strong> {{ current_user.oura_readiness_score }}/100
             </div>
+        {% else %}
+            <!-- Manual Fitness Score Input (shown when no tracker connected) -->
+            <div style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <strong style="color: #856404;">Today's Energy Levels (Optional)</strong>
+                    <button id="toggle-manual-scores" type="button" class="btn" style="background: #856404; color: white; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                        {% if current_user.manual_readiness_score %}Update{% else %}Add{% endif %}
+                    </button>
+                </div>
+                
+                <div id="manual-scores-form" style="display: none;">
+                    <div style="margin-bottom: 0.75rem;">
+                        <label for="manual-readiness" style="display: block; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                            Readiness (0-100): How ready do you feel for physical activity?
+                        </label>
+                        <input type="range" id="manual-readiness" min="0" max="100" value="{{ current_user.manual_readiness_score or 70 }}" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666;">
+                            <span>Low (0)</span>
+                            <span id="readiness-value" style="font-weight: 600; color: #856404;">{{ current_user.manual_readiness_score or 70 }}</span>
+                            <span>High (100)</span>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 0.75rem;">
+                        <label for="manual-sleep" style="display: block; margin-bottom: 0.25rem; font-size: 0.9rem;">
+                            Sleep Quality (0-100): How well did you sleep last night?
+                        </label>
+                        <input type="range" id="manual-sleep" min="0" max="100" value="{{ current_user.manual_sleep_score or 70 }}" style="width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666;">
+                            <span>Poor (0)</span>
+                            <span id="sleep-value" style="font-weight: 600; color: #856404;">{{ current_user.manual_sleep_score or 70 }}</span>
+                            <span>Excellent (100)</span>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="save-manual-scores" class="btn btn-success" style="width: 100%; padding: 0.6rem;">
+                        Save Scores
+                    </button>
+                </div>
+                
+                {% if current_user.manual_readiness_score and current_user.manual_score_date %}
+                    <div style="font-size: 0.85rem; color: #856404; margin-top: 0.5rem;">
+                        Last updated: {{ current_user.manual_score_date.strftime('%b %d, %Y') }} - 
+                        Readiness: {{ current_user.manual_readiness_score }}/100
+                        {% if current_user.manual_sleep_score %}, Sleep: {{ current_user.manual_sleep_score }}/100{% endif %}
+                    </div>
+                {% endif %}
+            </div>
         {% endif %}
         
         <div style="margin-top: 1.5rem;">
@@ -365,6 +413,71 @@
 
 {% block extra_js %}
 <script>
+    // Manual fitness score handlers
+    const toggleBtn = document.getElementById('toggle-manual-scores');
+    const manualForm = document.getElementById('manual-scores-form');
+    const readinessSlider = document.getElementById('manual-readiness');
+    const sleepSlider = document.getElementById('manual-sleep');
+    const readinessValue = document.getElementById('readiness-value');
+    const sleepValue = document.getElementById('sleep-value');
+    const saveBtn = document.getElementById('save-manual-scores');
+    
+    if (toggleBtn && manualForm) {
+        toggleBtn.addEventListener('click', function() {
+            manualForm.style.display = manualForm.style.display === 'none' ? 'block' : 'none';
+        });
+    }
+    
+    if (readinessSlider && readinessValue) {
+        readinessSlider.addEventListener('input', function() {
+            readinessValue.textContent = this.value;
+        });
+    }
+    
+    if (sleepSlider && sleepValue) {
+        sleepSlider.addEventListener('input', function() {
+            sleepValue.textContent = this.value;
+        });
+    }
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async function() {
+            const readiness = readinessSlider?.value;
+            const sleep = sleepSlider?.value;
+            
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            try {
+                const response = await fetch('{{ url_for("planning.update_manual_scores") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        readiness_score: parseInt(readiness),
+                        sleep_score: parseInt(sleep)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ Scores saved successfully!');
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to save scores'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Scores';
+            }
+        });
+    }
+    
+    // Plan generation handler
     document.getElementById('generate-btn')?.addEventListener('click', async function() {
         const btn = this;
         const loading = document.getElementById('loading');

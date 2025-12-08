@@ -53,6 +53,43 @@ def plan():
     return render_template('plan.html', activities=activities, weather_forecast=weather_forecast)
 
 
+@planning_bp.route('/update_manual_scores', methods=['POST'])
+@login_required
+def update_manual_scores():
+    """Update user's manual readiness and sleep scores."""
+    try:
+        data = request.get_json()
+        readiness_score = data.get('readiness_score')
+        sleep_score = data.get('sleep_score')
+        
+        # Validate scores
+        if readiness_score is not None:
+            if not (0 <= readiness_score <= 100):
+                return jsonify({'error': 'Readiness score must be between 0 and 100'}), 400
+            current_user.manual_readiness_score = readiness_score
+        
+        if sleep_score is not None:
+            if not (0 <= sleep_score <= 100):
+                return jsonify({'error': 'Sleep score must be between 0 and 100'}), 400
+            current_user.manual_sleep_score = sleep_score
+        
+        # Update the date
+        current_user.manual_score_date = datetime.now().date()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Scores updated successfully',
+            'readiness_score': current_user.manual_readiness_score,
+            'sleep_score': current_user.manual_sleep_score
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update scores: {str(e)}'}), 500
+
+
 @planning_bp.route('/generate_plan', methods=['POST'])
 @login_required
 def generate_plan():
@@ -96,14 +133,22 @@ def generate_plan():
     current_date = now.strftime('%A, %B %d, %Y')
     current_time = now.strftime('%I:%M %p')
     
-    # Get readiness scores
+    # Get readiness scores (prioritize tracker data, fallback to manual)
     readiness_score = None
     sleep_score = None
+    
     if current_user.fitbit_connected:
         readiness_score = current_user.fitbit_readiness_score
         sleep_score = current_user.fitbit_sleep_score
     elif current_user.oura_connected and current_user.oura_readiness_score:
         readiness_score = current_user.oura_readiness_score
+    
+    # Fallback to manual scores if no tracker data available
+    if readiness_score is None and current_user.manual_readiness_score is not None:
+        # Check if manual scores are from today
+        if current_user.manual_score_date and current_user.manual_score_date >= now.date():
+            readiness_score = current_user.manual_readiness_score
+            sleep_score = current_user.manual_sleep_score
     
     # Build prompt
     prompt = _build_planning_prompt(

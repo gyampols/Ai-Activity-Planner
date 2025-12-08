@@ -1,9 +1,0 @@
-VERSION: 2.0-modular-with-blueprints
-COMMIT: ea6f04b
-DATE: 2025-12-06
-FEATURES:
-- Modular architecture with Flask blueprints
-- Fixed checkbox alignment in log page
-- Repeating appointments feature
-- CircleCI auto-deployment
-- Removed app_old.py to fix import conflicts

@@ -32,7 +32,12 @@ class User(UserMixin, db.Model):
     fitbit_sleep_score = db.Column(db.Integer)  # Fitbit sleep score from API
     fitbit_token = db.Column(db.Text, nullable=True)
     oura_connected = db.Column(db.Boolean, default=False)
-    oura_readiness_score = db.Column(db.Integer)  # Mock readiness score
+    oura_readiness_score = db.Column(db.Integer)  # Oura readiness score from API
+    
+    # Manual fitness scores (fallback when no tracker connected)
+    manual_readiness_score = db.Column(db.Integer, nullable=True)  # 0-100
+    manual_sleep_score = db.Column(db.Integer, nullable=True)  # 0-100
+    manual_score_date = db.Column(db.Date, nullable=True)  # Date scores were last updated
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     activities = db.relationship('Activity', backref='user', lazy=True, cascade='all, delete-orphan')
