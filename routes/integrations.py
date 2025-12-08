@@ -183,32 +183,15 @@ def _fetch_fitbit_sleep(fitbit_headers, today):
                 else:
                     current_user.fitbit_sleep_score = None
                 
-                # Calculate readiness from sleep if not available
-                if current_user.fitbit_readiness_score is None:
-                    sleep_minutes = sleep_data.get('summary', {}).get('totalMinutesAsleep', 0)
-                    if sleep_minutes > 0:
-                        # Calculate readiness based on sleep (7-9 hours optimal)
-                        if 420 <= sleep_minutes <= 540:  # 7-9 hours
-                            current_user.fitbit_readiness_score = min(100, 85 + (sleep_minutes - 420) // 12)
-                        elif sleep_minutes < 420:
-                            current_user.fitbit_readiness_score = max(40, 85 - (420 - sleep_minutes) // 6)
-                        else:
-                            current_user.fitbit_readiness_score = max(70, 90 - (sleep_minutes - 540) // 10)
-                    else:
-                        current_user.fitbit_readiness_score = 75
+                # Note: Fitbit Daily Readiness Score is a separate metric
+                # We do NOT calculate it from sleep data
             else:
                 current_user.fitbit_sleep_score = None
-                if current_user.fitbit_readiness_score is None:
-                    current_user.fitbit_readiness_score = 75
         else:
             current_user.fitbit_sleep_score = None
-            if current_user.fitbit_readiness_score is None:
-                current_user.fitbit_readiness_score = 75
     except Exception as e:
         print(f"Fitbit sleep fetch error: {e}")
         current_user.fitbit_sleep_score = None
-        if current_user.fitbit_readiness_score is None:
-            current_user.fitbit_readiness_score = 75
 
 
 @integrations_bp.route('/connect/google')

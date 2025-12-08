@@ -67,6 +67,44 @@
             {% endif %}
         </div>
     </div>
+    
+    <!-- Manual Fitness Score Input -->
+    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #ddd;">
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Manual Fitness Scores:</h3>
+        <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+            Don't have a fitness tracker? Manually input your sleep and readiness scores (0-100).
+            {% if current_user.manual_score_date %}
+            <br><span style="color: #27ae60;">Last updated: {{ current_user.manual_score_date.strftime('%B %d, %Y') }}</span>
+            {% endif %}
+        </p>
+        
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px;">
+            <div class="form-group">
+                <label for="manual_sleep_score">Sleep Score (0-100)</label>
+                <input type="range" id="manual_sleep_score" name="manual_sleep_score" 
+                       min="0" max="100" value="{{ current_user.manual_sleep_score or 50 }}"
+                       style="width: 100%;">
+                <div style="text-align: center; font-weight: bold; color: #2c3e50; margin-top: 0.5rem;">
+                    <span id="sleep_score_value">{{ current_user.manual_sleep_score or 50 }}</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="manual_readiness_score">Readiness Score (0-100)</label>
+                <input type="range" id="manual_readiness_score" name="manual_readiness_score" 
+                       min="0" max="100" value="{{ current_user.manual_readiness_score or 50 }}"
+                       style="width: 100%;">
+                <div style="text-align: center; font-weight: bold; color: #2c3e50; margin-top: 0.5rem;">
+                    <span id="readiness_score_value">{{ current_user.manual_readiness_score or 50 }}</span>
+                </div>
+            </div>
+            
+            <button id="save_manual_scores" class="btn btn-success" style="width: 100%;">
+                Save Manual Scores
+            </button>
+            <div id="manual_scores_message" style="margin-top: 0.5rem; text-align: center;"></div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -638,5 +676,45 @@ window.onclick = function(event) {
         closeEditAppointmentModal();
     }
 }
+
+// Manual fitness scores functionality
+document.getElementById('manual_sleep_score').addEventListener('input', function(e) {
+    document.getElementById('sleep_score_value').textContent = e.target.value;
+});
+
+document.getElementById('manual_readiness_score').addEventListener('input', function(e) {
+    document.getElementById('readiness_score_value').textContent = e.target.value;
+});
+
+document.getElementById('save_manual_scores').addEventListener('click', function() {
+    const sleepScore = parseInt(document.getElementById('manual_sleep_score').value);
+    const readinessScore = parseInt(document.getElementById('manual_readiness_score').value);
+    const messageDiv = document.getElementById('manual_scores_message');
+    
+    fetch('/update_manual_scores', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            sleep_score: sleepScore,
+            readiness_score: readinessScore
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            messageDiv.innerHTML = '<span style="color: #27ae60;">✓ Scores saved successfully!</span>';
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 3000);
+        } else {
+            messageDiv.innerHTML = '<span style="color: #e74c3c;">Error: ' + data.error + '</span>';
+        }
+    })
+    .catch(error => {
+        messageDiv.innerHTML = '<span style="color: #e74c3c;">Error saving scores</span>';
+    });
+});
 </script>
 {% endblock %}

@@ -5,7 +5,7 @@ A Flask application that helps users plan their weekly activities based on:
 - Weather forecasts
 - Biometric data (Fitbit, Oura)
 - Personal preferences
-- AI-powered suggestions using OpenAI GPT-5
+- AI-powered suggestions using OpenAI GPT-4
 
 Modular architecture:
 - config.py: All configuration and environment variables

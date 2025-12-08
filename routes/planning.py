@@ -161,9 +161,9 @@ def generate_plan():
             # Return mock response if no API key
             return jsonify(_generate_mock_plan(activities, now, weather_forecast))
         
-        # Make OpenAI API call with GPT-5
+        # Make OpenAI API call with latest model
         response = openai_client.chat.completions.create(
-            model="gpt-5",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful fitness and activity planning assistant. Always respond with valid JSON format."},
                 {"role": "user", "content": prompt}
