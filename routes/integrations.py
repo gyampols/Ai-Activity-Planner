@@ -377,3 +377,137 @@ def disconnect_oura():
     else:
         flash('No Oura account connected.', 'info')
     return redirect(request.referrer or url_for('activities.log'))
+
+
+@integrations_bp.route('/import_calendar_events', methods=['POST'])
+@login_required
+def import_calendar_events():
+    """Import events from Google Calendar as appointments."""
+    from flask import jsonify
+    from models import Appointment
+    from datetime import datetime, timedelta
+    
+    if not current_user.google_token:
+        return jsonify({'success': False, 'error': 'Google account not connected'}), 400
+    
+    try:
+        from googleapiclient.discovery import build
+        from google.oauth2.credentials import Credentials
+        import pytz
+        
+        # Create credentials from stored token
+        creds = Credentials(
+            token=current_user.google_token,
+            refresh_token=current_user.google_refresh_token,
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=config.GOOGLE_CLIENT_ID,
+            client_secret=config.GOOGLE_CLIENT_SECRET
+        )
+        
+        # Build calendar service
+        service = build('calendar', 'v3', credentials=creds)
+        
+        # Get events for the next 30 days
+        now = datetime.utcnow()
+        time_min = now.isoformat() + 'Z'
+        time_max = (now + timedelta(days=30)).isoformat() + 'Z'
+        
+        # Fetch events from primary calendar
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=50,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        imported_count = 0
+        
+        for event in events:
+            # Skip if no summary (title)
+            if 'summary' not in event:
+                continue
+            
+            title = event['summary']
+            
+            # Parse start time
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            if not start:
+                continue
+            
+            # Check if event already exists (avoid duplicates)
+            if 'dateTime' in event['start']:
+                # Timed event
+                start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                event_date = start_dt.date()
+                event_time = start_dt.time()
+                
+                # Calculate duration
+                end = event['end'].get('dateTime', event['end'].get('date'))
+                if end:
+                    end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                    duration = int((end_dt - start_dt).total_seconds() / 60)
+                else:
+                    duration = 60  # Default 1 hour
+            else:
+                # All-day event
+                event_date = datetime.fromisoformat(start).date()
+                event_time = None
+                duration = None
+            
+            # Check for duplicate
+            existing = Appointment.query.filter_by(
+                user_id=current_user.id,
+                title=title,
+                date=event_date
+            ).first()
+            
+            if existing:
+                continue  # Skip duplicates
+            
+            # Determine appointment type from title/description
+            description = event.get('description', '')
+            title_lower = title.lower()
+            
+            if any(word in title_lower for word in ['work', 'meeting', 'call', 'standup', 'sync']):
+                apt_type = 'Work'
+            elif any(word in title_lower for word in ['class', 'lecture', 'study', 'exam', 'school']):
+                apt_type = 'School'
+            elif any(word in title_lower for word in ['doctor', 'dentist', 'appointment', 'checkup', 'medical']):
+                apt_type = 'Medical'
+            elif any(word in title_lower for word in ['dinner', 'lunch', 'coffee', 'party', 'hangout']):
+                apt_type = 'Social'
+            else:
+                apt_type = 'Other'
+            
+            # Create appointment
+            appointment = Appointment(
+                user_id=current_user.id,
+                title=title,
+                appointment_type=apt_type,
+                date=event_date,
+                time=event_time,
+                duration_minutes=duration,
+                description=description[:500] if description else None,  # Limit description length
+                repeating_days=None  # Google Calendar recurring events handled separately
+            )
+            
+            db.session.add(appointment)
+            imported_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'count': imported_count,
+            'message': f'Successfully imported {imported_count} event(s) from Google Calendar'
+        })
+        
+    except Exception as e:
+        print(f"Error importing calendar events: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to import events: {str(e)}'
+        }), 500

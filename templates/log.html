@@ -22,13 +22,15 @@
             Connect Google Account
         </a>
         {% else %}
-        <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <button class="btn btn-primary" disabled>✓ Google Connected</button>
+            <button id="import_calendar_btn" class="btn" style="background: #4285f4; color: white;">Import Calendar Events</button>
             <form method="POST" action="{{ url_for('integrations.disconnect_google') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to disconnect your Google account?');">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <button type="submit" class="btn" style="background: #dc3545; color: white;">Disconnect</button>
             </form>
         </div>
+        <div id="import_status" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
         {% endif %}
     </div>
     
@@ -708,5 +710,44 @@ document.getElementById('save_manual_scores').addEventListener('click', function
         messageDiv.innerHTML = '<span style="color: #e74c3c;">Error saving scores</span>';
     });
 });
+
+// Import Google Calendar events functionality
+const importBtn = document.getElementById('import_calendar_btn');
+if (importBtn) {
+    importBtn.addEventListener('click', function() {
+        const statusDiv = document.getElementById('import_status');
+        const btn = this;
+        
+        // Disable button and show loading
+        btn.disabled = true;
+        btn.textContent = 'Importing...';
+        statusDiv.innerHTML = '<span style="color: #3498db;">⏳ Fetching events from Google Calendar...</span>';
+        
+        fetch('/import_calendar_events', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusDiv.innerHTML = `<span style="color: #27ae60;">✓ Successfully imported ${data.count} event(s)!</span>`;
+                setTimeout(() => {
+                    location.reload(); // Reload to show new appointments
+                }, 1500);
+            } else {
+                statusDiv.innerHTML = `<span style="color: #e74c3c;">Error: ${data.error}</span>`;
+                btn.disabled = false;
+                btn.textContent = 'Import Calendar Events';
+            }
+        })
+        .catch(error => {
+            statusDiv.innerHTML = '<span style="color: #e74c3c;">Error importing events. Please try again.</span>';
+            btn.disabled = false;
+            btn.textContent = 'Import Calendar Events';
+        });
+    });
+}
 </script>
 {% endblock %}

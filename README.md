@@ -104,17 +104,7 @@ Go to the **Log** page to add activities you enjoy:
 - **Dependencies**: Requirements like "Good weather" or "Gym membership"
 - **Preferred Time**: Morning, Afternoon, Evening, or Night
 - **Preferred Days**: Select which days of the week work best
-
-**Example Activity:**
-```
-Name: Morning Run
-Location: Local Park
-Duration: 30 minutes
-Intensity: Medium
-Dependencies: Good weather
-Preferred Time: Morning
-Preferred Days: Mon, Wed, Fri
-```
+![sample activity](static/Images/sampleActivity.png)
 
 ### 4. Add Appointments (Optional)
 
@@ -126,7 +116,7 @@ If you have fixed commitments, add them in the **Log** page:
 - **Date & Time**: When it occurs
 - **Duration**: How long it lasts
 - **Repeating**: Can repeat on specific days of the week
-
+![alt text](static/Images/sampleAppointment.png)
 **Why add appointments?**
 The AI will schedule your activities around these fixed commitments, ensuring no conflicts.
 
@@ -151,7 +141,7 @@ If you don't have a fitness tracker, scroll down on the Log page to find the "Ma
   - 70-89: Good energy
   - 50-69: Moderate energy
   - Below 50: Low energy
-
+![fitbit](static/Images/manualScores.png)
 Use the sliders to adjust your scores and click "Save Manual Scores". Update these daily for best results!
 
 ### 6. Connect Google Calendar (Optional)
@@ -179,7 +169,7 @@ Navigate to the **Plan** page:
    - Example: "Focus on cardio this week"
    - Example: "I'm recovering from injury, keep intensity low"
    - Example: "Plan extra rest days"
-
+![alt text](static/Images/plan.png)
 3. Click **"Generate Plan"**
 
 4. Review your personalized weekly schedule with:
