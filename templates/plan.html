@@ -73,14 +73,21 @@
         margin-bottom: 1rem;
     }
     
+    .weather-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+    }
+    
     .weather-day {
-        display: inline-block;
-        margin: 0.5rem;
-        padding: 0.5rem;
+        flex: 0 1 auto;
+        padding: 0.75rem;
         background: white;
-        border-radius: 4px;
+        border-radius: 8px;
         text-align: center;
-        min-width: 100px;
+        min-width: 90px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     #loading {
@@ -104,21 +111,83 @@
         100% { transform: rotate(360deg); }
     }
     
-    @media (max-width: 1200px) {
+    /* Desktop - 7 columns */
+    @media (min-width: 1200px) {
+        .calendar-grid {
+            grid-template-columns: repeat(7, 1fr);
+        }
+    }
+    
+    /* Tablet landscape - 4 columns */
+    @media (min-width: 768px) and (max-width: 1199px) {
         .calendar-grid {
             grid-template-columns: repeat(4, 1fr);
         }
     }
     
-    @media (max-width: 768px) {
+    /* Tablet portrait - 3 columns */
+    @media (min-width: 600px) and (max-width: 767px) {
         .calendar-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+        }
+        .weather-day {
+            min-width: 80px;
+            padding: 0.5rem;
         }
     }
     
-    @media (max-width: 480px) {
+    /* Mobile - 2 columns */
+    @media (min-width: 400px) and (max-width: 599px) {
+        .calendar-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .calendar-day {
+            padding: 0.75rem;
+            min-height: 130px;
+        }
+        .weather-day {
+            min-width: 70px;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+        }
+    }
+    
+    /* Small mobile - 1 column */
+    @media (max-width: 399px) {
         .calendar-grid {
             grid-template-columns: 1fr;
+        }
+        .calendar-day {
+            padding: 0.75rem;
+            min-height: auto;
+        }
+        .weather-day {
+            min-width: 70px;
+            padding: 0.4rem;
+            font-size: 0.85rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+        }
+        h2 {
+            font-size: 1.2rem;
+        }
+    }
+    
+    /* Better mobile touch targets and spacing */
+    @media (max-width: 767px) {
+        .btn {
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            width: 100%;
+            margin: 0.5rem 0;
+        }
+        input[type="text"],
+        textarea {
+            font-size: 16px !important; /* Prevents zoom on iOS */
+        }
+        .card {
+            padding: 1rem;
         }
     }
     
@@ -172,17 +241,17 @@
     
     {% if weather_forecast %}
     <div class="weather-section">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
             <h3 style="margin: 0;">7-Day Weather Forecast</h3>
-            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.5rem 1rem;">
+            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.5rem 1rem; font-size: 0.9rem;">
                 Switch to °{{ 'C' if current_user.temperature_unit == 'F' else 'F' }}
             </button>
         </div>
-        <div style="overflow-x: auto;">
+        <div class="weather-container">
             {% for day in weather_forecast %}
-                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db;"{% endif %}>
-                    <strong>{{ day.date_short }}{% if day.is_today %} (Today){% endif %}</strong><br>
-                    🌡️ <span class="temp-display">{{ day.temp_max }}°{{ current_user.temperature_unit or 'C' }}</span><br>
+                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db; font-weight: 600;"{% endif %}>
+                    <strong>{{ day.date_short }}</strong>{% if day.is_today %}<br><span style="color: #3498db; font-size: 0.85rem;">(Today)</span>{% endif %}<br>
+                    🌡️ <span class="temp-display">{{ day.temp_max }}° / {{ day.temp_min }}°{{ current_user.temperature_unit or 'C' }}</span><br>
                     💧 {{ day.precipitation }}%<br>
                     <small style="color: #666;">
                         🌅 {{ day.sunrise }}<br>

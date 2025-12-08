@@ -104,7 +104,11 @@ def get_weather_forecast(location, unit='C'):
         
         # Format the forecast
         forecast = []
-        today = datetime.now().date()
+        # Use location's timezone to determine "today"
+        from datetime import timezone as tz
+        import pytz
+        location_tz = pytz.timezone(timezone_str)
+        today = datetime.now(location_tz).date()
         
         for i in range(7):
             # fromisoformat returns a datetime, extract just the date
