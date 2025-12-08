@@ -161,15 +161,37 @@ def generate_plan():
             # Return mock response if no API key
             return jsonify(_generate_mock_plan(activities, now, weather_forecast))
         
-        # Make OpenAI API call with latest model
+        # Make OpenAI API call with optimized parameters
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a helpful fitness and activity planning assistant. Always respond with valid JSON format."},
+                {
+                    "role": "system", 
+                    "content": """You are an expert fitness and wellness planning assistant specializing in personalized activity scheduling.
+
+CORE COMPETENCIES:
+- Exercise science and recovery optimization
+- Weather-based activity planning
+- Time management and scheduling logic
+- Biometric data interpretation (readiness/sleep scores)
+
+OUTPUT REQUIREMENTS:
+- Always return pure JSON (no markdown, no code blocks, no explanations)
+- Follow exact date key format provided in prompt
+- Apply logical reasoning for activity timing and intensity
+- Consider all constraints (appointments, weather, daylight, fitness levels)
+
+DECISION PRINCIPLES:
+- Safety first (weather conditions, recovery needs, daylight requirements)
+- Respect user preferences (time/day preferences, activity types)
+- Balance variety with consistency
+- Optimize for long-term adherence and enjoyment"""
+                },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1500,
-            temperature=0.7
+            max_tokens=2000,
+            temperature=0.7,
+            response_format={"type": "json_object"}
         )
         
         plan_text = response.choices[0].message.content
@@ -305,38 +327,67 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
         multiple_activities_instruction = "13. Schedule ONE activity per day maximum (unless user has specific appointments/responsibilities)\n"
     
     prompt += f"""
-Create a balanced weekly schedule that:
-1. Distributes activities throughout the week based on weather conditions
-2. For TODAY ONLY ({date_keys[0][1]}, current time {current_time}): 
-   - Adjust intensity based on today's readiness/sleep scores if provided
-   - Consider the current time of day ({current_time}) - if it's late in the day, suggest evening-appropriate activities or rest
-   - If it's early morning, suggest morning activities; if afternoon, suggest afternoon activities
-   - Check if it's before sunset for outdoor activities requiring daylight
-3. For FUTURE DAYS: Plan normally based on weather and preferences (no readiness data available yet)
-4. Respect activity time preferences (Morning, Afternoon, Evening, Night) when provided
-5. Respect preferred days of the week for activities when specified
-6. Work around scheduled appointments - DO NOT schedule activities that conflict with appointments
-7. Consider sunrise and sunset times - ONLY schedule outdoor activities that require daylight between sunrise and sunset
-8. For activities requiring daylight (e.g., outdoor sports, hiking, biking), ensure they're scheduled during daylight hours
-9. Indoor activities can be scheduled any time
-10. Considers intensity levels to avoid overtraining across the week
-11. Takes into account dependencies (weather, equipment, location)
-12. Schedules outdoor activities on days with good weather AND sufficient daylight
-{multiple_activities_instruction}
+TASK: Create a balanced 7-day activity schedule optimized for the user's preferences, fitness level, and environmental conditions.
 
-Please provide a day-by-day plan starting from today in the following JSON format for easy calendar display.
-Use the following date keys (these are the actual dates):
+CRITICAL SCHEDULING RULES:
+1. **Date-Specific Context**:
+   - TODAY is {date_keys[0][1]} at {current_time}
+   - If readiness/sleep scores provided, apply ONLY to today
+   - For today's activities: respect current time (if evening, schedule evening activities; if morning, schedule morning activities)
+   - Future days (days 2-7): plan based on preferences and weather only
+
+2. **Appointment Conflicts** (MUST FOLLOW):
+   - NEVER schedule activities that overlap with appointments
+   - Leave buffer time before/after appointments
+   - If appointment time unknown, assume morning slot unavailable
+
+3. **Daylight Requirements** (MUST FOLLOW):
+   - Outdoor activities requiring visibility MUST occur between sunrise and sunset
+   - Examples requiring daylight: running, cycling, hiking, outdoor sports, photography
+   - Indoor activities have no time restrictions
+
+4. **Activity Distribution**:
+   - Spread intensity levels across the week (no back-to-back high-intensity)
+   - Honor preferred days/times when specified
+   - Match activities to optimal weather conditions
+{multiple_activities_instruction.replace('13.', '   -')}
+
+5. **Weather Optimization**:
+   - Schedule weather-dependent activities on best forecast days
+   - Reserve backup indoor activities for poor weather days
+   - Consider precipitation AND temperature for outdoor activities
+
+DECISION FRAMEWORK:
+- FOR TODAY: Readiness score → Intensity level → Time of day → Activity selection
+- FOR FUTURE DAYS: Weather forecast → Activity dependencies → Time preferences → Schedule
+
+OUTPUT FORMAT:
+Return a valid JSON object with date keys mapping to activity details.
+Use these EXACT date keys:
 """
     for date_key, day_name in date_keys:
         prompt += f'  "{date_key}": {{"day_name": "{day_name}", "activity": "Activity name or Rest", "time": "HH:MM", "duration_minutes": 60, "notes": "Brief explanation"}}\n'
     
     prompt += """
-IMPORTANT: For each activity:
-- Include "time" in 24-hour format (HH:MM) based on the activity's preferred time or suitable time of day
-- Include "duration_minutes" as a number (e.g., 30, 60, 90) based on typical activity duration
-- For rest days, you can omit time and duration or set them to null
+FIELD SPECIFICATIONS:
+- "day_name": Use provided day names exactly as shown above
+- "activity": Activity name from user's list, or "Rest" for recovery days
+- "time": 24-hour format (HH:MM) based on:
+  * Activity's preferred time if specified
+  * Current time for today (schedule after current time)
+  * Daylight hours for outdoor activities
+  * Optimal time for activity type (e.g., running early morning, yoga evening)
+- "duration_minutes": Integer based on activity's typical duration (default to activity duration if specified)
+- "notes": 1-2 sentences explaining why this activity fits today (weather, recovery, timing)
 
-Return only the JSON object with these exact date keys.
+RESPONSE REQUIREMENTS:
+1. Return ONLY valid JSON - no markdown, no explanations, no code blocks
+2. Use exact date keys provided above
+3. Every date must have an entry (use "Rest" for recovery days)
+4. Ensure all times are logical and follow daylight/appointment constraints
+5. Notes should reference specific factors (weather, readiness, time of day)
+
+Begin JSON output:
 """
     
     return prompt

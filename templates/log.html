@@ -69,41 +69,33 @@
     </div>
     
     <!-- Manual Fitness Score Input -->
-    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #ddd;">
-        <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Manual Fitness Scores:</h3>
-        <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Don't have a fitness tracker? Manually input your sleep and readiness scores (0-100).
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: #555;">Manual Fitness Scores 
             {% if current_user.manual_score_date %}
-            <br><span style="color: #27ae60;">Last updated: {{ current_user.manual_score_date.strftime('%B %d, %Y') }}</span>
+            <span style="font-weight: normal; font-size: 0.85rem; color: #27ae60;">(Updated: {{ current_user.manual_score_date.strftime('%b %d') }})</span>
             {% endif %}
-        </p>
+        </h3>
         
-        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px;">
-            <div class="form-group">
-                <label for="manual_sleep_score">Sleep Score (0-100)</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px;">
+            <div>
+                <label for="manual_sleep_score" style="font-size: 0.85rem; display: block; margin-bottom: 0.25rem;">Sleep <span id="sleep_score_value" style="font-weight: bold; color: #2c3e50;">{{ current_user.manual_sleep_score or 50 }}</span></label>
                 <input type="range" id="manual_sleep_score" name="manual_sleep_score" 
                        min="0" max="100" value="{{ current_user.manual_sleep_score or 50 }}"
                        style="width: 100%;">
-                <div style="text-align: center; font-weight: bold; color: #2c3e50; margin-top: 0.5rem;">
-                    <span id="sleep_score_value">{{ current_user.manual_sleep_score or 50 }}</span>
-                </div>
             </div>
             
-            <div class="form-group">
-                <label for="manual_readiness_score">Readiness Score (0-100)</label>
+            <div>
+                <label for="manual_readiness_score" style="font-size: 0.85rem; display: block; margin-bottom: 0.25rem;">Readiness <span id="readiness_score_value" style="font-weight: bold; color: #2c3e50;">{{ current_user.manual_readiness_score or 50 }}</span></label>
                 <input type="range" id="manual_readiness_score" name="manual_readiness_score" 
                        min="0" max="100" value="{{ current_user.manual_readiness_score or 50 }}"
                        style="width: 100%;">
-                <div style="text-align: center; font-weight: bold; color: #2c3e50; margin-top: 0.5rem;">
-                    <span id="readiness_score_value">{{ current_user.manual_readiness_score or 50 }}</span>
-                </div>
             </div>
-            
-            <button id="save_manual_scores" class="btn btn-success" style="width: 100%;">
-                Save Manual Scores
-            </button>
-            <div id="manual_scores_message" style="margin-top: 0.5rem; text-align: center;"></div>
         </div>
+        
+        <button id="save_manual_scores" class="btn btn-success" style="margin-top: 0.5rem; padding: 0.4rem 0.8rem; font-size: 0.9rem;">
+            Save Scores
+        </button>
+        <div id="manual_scores_message" style="margin-top: 0.25rem; font-size: 0.85rem;"></div>
     </div>
 </div>
 
