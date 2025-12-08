@@ -295,11 +295,21 @@ def callback_connect_google():
         google_id = idinfo['sub']
         
         # Update current user's Google connection
+        # Store credentials as JSON to preserve scopes
+        credentials_dict = {
+            'token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'scopes': credentials.scopes
+        }
+        
         current_user.google_id = google_id
-        current_user.google_token = credentials.token
+        current_user.google_token = json.dumps(credentials_dict)
         current_user.google_refresh_token = credentials.refresh_token
         
-        print(f"[Google Connect] Stored token for user {current_user.id}, token length: {len(credentials.token) if credentials.token else 0}")
+        print(f"[Google Connect] Stored credentials with scopes for user {current_user.id}")
         
         db.session.commit()
         session.pop('connect_state', None)

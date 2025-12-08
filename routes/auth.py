@@ -1,6 +1,7 @@
 """
 Authentication routes including login, signup, and OAuth flows.
 """
+import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from google_auth_oauthlib.flow import Flow
@@ -197,13 +198,24 @@ def callback_google():
         # Check if user exists
         user = User.query.filter_by(google_id=google_id).first()
         
+        # Store credentials as JSON to preserve scopes
+        credentials_dict = {
+            'token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'scopes': credentials.scopes
+        }
+        credentials_json = json.dumps(credentials_dict)
+        
         if not user:
             # Check if email already exists
             user = User.query.filter_by(email=email).first()
             if user:
                 # Link Google account to existing user
                 user.google_id = google_id
-                user.google_token = credentials.token
+                user.google_token = credentials_json
                 user.google_refresh_token = credentials.refresh_token
             else:
                 # Create new user
@@ -218,13 +230,13 @@ def callback_google():
                     username=username,
                     email=email,
                     google_id=google_id,
-                    google_token=credentials.token,
+                    google_token=credentials_json,
                     google_refresh_token=credentials.refresh_token
                 )
                 db.session.add(user)
         else:
             # Update tokens
-            user.google_token = credentials.token
+            user.google_token = credentials_json
             if credentials.refresh_token:
                 user.google_refresh_token = credentials.refresh_token
         

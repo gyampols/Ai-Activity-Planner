@@ -342,29 +342,45 @@ def export_to_google_calendar():
         if not plan:
             return jsonify({'error': 'No plan data provided'}), 400
         
-        # Try to parse the token as JSON (in case it's stored as a JSON string)
-        try:
-            if current_user.google_token.startswith('{'):
-                token_data = json.loads(current_user.google_token)
-                access_token = token_data.get('access_token') or token_data.get('token')
-            else:
-                access_token = current_user.google_token
-        except:
-            access_token = current_user.google_token
-        
-        # Create credentials using google-auth-httplib2 for simpler token handling
+        # Parse the stored credentials
         from google.oauth2.credentials import Credentials
         
-        creds = Credentials(
-            token=access_token,
-            refresh_token=current_user.google_refresh_token,
-            token_uri='https://oauth2.googleapis.com/token',
-            client_id=config.GOOGLE_CLIENT_ID,
-            client_secret=config.GOOGLE_CLIENT_SECRET,
-            scopes=config.GOOGLE_SCOPES  # Add scopes so the API knows what permissions we have
-        )
+        try:
+            if current_user.google_token.startswith('{'):
+                # New format: JSON with scopes
+                credentials_dict = json.loads(current_user.google_token)
+                creds = Credentials(
+                    token=credentials_dict.get('token'),
+                    refresh_token=credentials_dict.get('refresh_token'),
+                    token_uri=credentials_dict.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                    client_id=credentials_dict.get('client_id', config.GOOGLE_CLIENT_ID),
+                    client_secret=credentials_dict.get('client_secret', config.GOOGLE_CLIENT_SECRET),
+                    scopes=credentials_dict.get('scopes')  # Use the actual scopes from the token
+                )
+                print(f"[Calendar] Loaded credentials from JSON with scopes: {creds.scopes}")
+            else:
+                # Old format: just the token string (fallback for existing users)
+                creds = Credentials(
+                    token=current_user.google_token,
+                    refresh_token=current_user.google_refresh_token,
+                    token_uri='https://oauth2.googleapis.com/token',
+                    client_id=config.GOOGLE_CLIENT_ID,
+                    client_secret=config.GOOGLE_CLIENT_SECRET,
+                    scopes=config.GOOGLE_SCOPES
+                )
+                print(f"[Calendar] Using legacy token format, assuming scopes: {config.GOOGLE_SCOPES}")
+        except Exception as e:
+            print(f"[Calendar] Error parsing credentials: {e}")
+            # Fallback to old method
+            creds = Credentials(
+                token=current_user.google_token,
+                refresh_token=current_user.google_refresh_token,
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=config.GOOGLE_CLIENT_ID,
+                client_secret=config.GOOGLE_CLIENT_SECRET,
+                scopes=config.GOOGLE_SCOPES
+            )
         
-        print(f"[Calendar] Created creds with scopes: {creds.scopes}")
         print(f"[Calendar] Token expired: {creds.expired}, Has refresh token: {bool(creds.refresh_token)}")
         
         # Refresh token if expired (this will also ensure scopes are validated)
