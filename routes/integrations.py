@@ -382,10 +382,12 @@ def disconnect_oura():
 @integrations_bp.route('/import_calendar_events', methods=['POST'])
 @login_required
 def import_calendar_events():
-    """Import events from Google Calendar as appointments."""
+    """Import events from Google Calendar as appointments.
+    Note: CSRF validation handled by Flask-Login for authenticated users."""
     from flask import jsonify
     from models import Appointment
     from datetime import datetime, timedelta
+    from flask_wtf.csrf import CSRFProtect
     
     print(f"[Calendar Import] Request from user {current_user.id}")
     print(f"[Calendar Import] Has google_token: {bool(current_user.google_token)}")

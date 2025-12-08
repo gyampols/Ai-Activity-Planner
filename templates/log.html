@@ -739,13 +739,25 @@ if (importBtn) {
         btn.textContent = 'Importing...';
         statusDiv.innerHTML = '<span style="color: #3498db;">⏳ Fetching events from Google Calendar...</span>';
         
+        // Get CSRF token from meta tag or form
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        
         fetch('/import_calendar_events', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-            }
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({})
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                });
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 statusDiv.innerHTML = `<span style="color: #27ae60;">✓ Successfully imported ${data.count} event(s)!</span>`;
@@ -755,13 +767,14 @@ if (importBtn) {
             } else {
                 statusDiv.innerHTML = `<span style="color: #e74c3c;">Error: ${data.error}</span>`;
                 btn.disabled = false;
-                btn.textContent = 'Import Calendar Events';
+                btn.textContent = 'Import from Google Calendar';
             }
         })
         .catch(error => {
-            statusDiv.innerHTML = '<span style="color: #e74c3c;">Error importing events. Please try again.</span>';
+            console.error('Import error:', error);
+            statusDiv.innerHTML = `<span style="color: #e74c3c;">Error: ${error.message || 'Failed to import events. Please try again.'}</span>`;
             btn.disabled = false;
-            btn.textContent = 'Import Calendar Events';
+            btn.textContent = 'Import from Google Calendar';
         });
     });
 }

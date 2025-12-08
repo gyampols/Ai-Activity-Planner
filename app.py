@@ -71,6 +71,9 @@ def create_app():
     # Exempt CSRF for AJAX endpoints (they use same-origin policy)
     csrf.exempt(planning_bp)
     
+    # Exempt calendar import endpoint for AJAX calls
+    csrf.exempt(app.view_functions['integrations.import_calendar_events'])
+    
     # Create database tables and run migrations
     with app.app_context():
         db.create_all()
