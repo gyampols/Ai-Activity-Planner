@@ -420,10 +420,15 @@ def export_to_google_calendar():
             print(f"[Calendar] Service build failed: {e}")
             return jsonify({'error': f'Failed to connect to Google Calendar API. Please reconnect your Google account. Error: {str(e)}'}), 500
         
-        # Use user's location timezone if available, otherwise UTC
+        # Get timezone from weather data (same as in generate_plan)
         # Note: We don't fetch calendar.get() because that requires calendar.readonly scope
         # The calendar.events scope only allows event operations, not calendar metadata
-        timezone = current_user.location if current_user.location else 'UTC'
+        timezone = 'UTC'
+        if current_user.location:
+            temp_unit = current_user.temperature_unit or 'C'
+            weather_data = get_weather_forecast(current_user.location, temp_unit)
+            if weather_data:
+                timezone = weather_data.get('timezone', 'UTC')
         print(f"[Calendar] Using timezone: {timezone}")
         
         tz = pytz.timezone(timezone)
