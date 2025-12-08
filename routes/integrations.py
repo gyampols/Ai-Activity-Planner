@@ -395,13 +395,26 @@ def import_calendar_events():
         from google.oauth2.credentials import Credentials
         import pytz
         
+        # Parse stored credentials (stored as JSON)
+        try:
+            credentials_dict = json.loads(current_user.google_token)
+            token = credentials_dict.get('token')
+            refresh_token = credentials_dict.get('refresh_token')
+            scopes = credentials_dict.get('scopes', [])
+        except (json.JSONDecodeError, AttributeError):
+            # Fallback if token is stored as plain string
+            token = current_user.google_token
+            refresh_token = current_user.google_refresh_token
+            scopes = None
+        
         # Create credentials from stored token
         creds = Credentials(
-            token=current_user.google_token,
-            refresh_token=current_user.google_refresh_token,
+            token=token,
+            refresh_token=refresh_token,
             token_uri='https://oauth2.googleapis.com/token',
             client_id=config.GOOGLE_CLIENT_ID,
-            client_secret=config.GOOGLE_CLIENT_SECRET
+            client_secret=config.GOOGLE_CLIENT_SECRET,
+            scopes=scopes
         )
         
         # Build calendar service
@@ -499,6 +512,8 @@ def import_calendar_events():
         
         db.session.commit()
         
+        print(f"[Calendar Import] Successfully imported {imported_count} events for user {current_user.id}")
+        
         return jsonify({
             'success': True,
             'count': imported_count,
@@ -506,7 +521,10 @@ def import_calendar_events():
         })
         
     except Exception as e:
-        print(f"Error importing calendar events: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"[Calendar Import] Error for user {current_user.id}: {e}")
+        print(f"[Calendar Import] Full traceback:\n{error_trace}")
         return jsonify({
             'success': False,
             'error': f'Failed to import events: {str(e)}'
