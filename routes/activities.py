@@ -60,7 +60,7 @@ def add_activity():
         name=name[:100],
         location=location[:200] if location else None,
         duration_minutes=duration_minutes,
-        intensity=intensity if intensity in ['Low', 'Medium', 'High'] else None,
+        intensity=intensity if intensity in ['Low', 'Medium', 'High', 'Very High'] else None,
         dependencies=dependencies[:500] if dependencies else None,
         description=description[:1000] if description else None,
         preferred_time=preferred_time if preferred_time else None,
@@ -218,7 +218,7 @@ def edit_activity(activity_id):
     activity.name = name[:100]
     activity.location = location[:200] if location else None
     activity.duration_minutes = duration_minutes
-    activity.intensity = intensity if intensity in ['Low', 'Medium', 'High'] else None
+    activity.intensity = intensity if intensity in ['Low', 'Medium', 'High', 'Very High'] else None
     activity.dependencies = dependencies[:500] if dependencies else None
     activity.description = description[:1000] if description else None
     activity.preferred_time = preferred_time if preferred_time else None

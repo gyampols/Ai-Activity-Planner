@@ -99,6 +99,9 @@ def get_weather_forecast(location, unit='C'):
         weather_response = requests.get(weather_url, timeout=5)
         weather_data = weather_response.json()
         
+        # Get timezone from weather data
+        timezone_str = weather_data.get('timezone', 'UTC')
+        
         # Format the forecast
         forecast = []
         today = datetime.now().date()
@@ -124,7 +127,8 @@ def get_weather_forecast(location, unit='C'):
                 'is_today': date.date() == today
             })
         
-        return forecast
+        # Return both forecast and timezone
+        return {'forecast': forecast, 'timezone': timezone_str}
     except Exception as e:
         print(f"Weather fetch error: {e}")
         return None

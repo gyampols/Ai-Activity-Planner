@@ -46,7 +46,9 @@ def plan():
     
     if current_user.location:
         temp_unit = current_user.temperature_unit or 'C'
-        weather_forecast = get_weather_forecast(current_user.location, temp_unit)
+        weather_data = get_weather_forecast(current_user.location, temp_unit)
+        if weather_data:
+            weather_forecast = weather_data.get('forecast')
     
     return render_template('plan.html', activities=activities, weather_forecast=weather_forecast)
 
@@ -69,16 +71,29 @@ def generate_plan():
         extra_info = ''
         allow_multiple = False
     
-    # Get current date and time
-    now = datetime.now()
-    current_date = now.strftime('%A, %B %d, %Y')
-    current_time = now.strftime('%I:%M %p')
-    
-    # Get weather forecast
+    # Get weather forecast and timezone
     weather_forecast = None
+    location_timezone = None
     if current_user.location:
         temp_unit = current_user.temperature_unit or 'C'
-        weather_forecast = get_weather_forecast(current_user.location, temp_unit)
+        weather_data = get_weather_forecast(current_user.location, temp_unit)
+        if weather_data:
+            weather_forecast = weather_data.get('forecast')
+            location_timezone = weather_data.get('timezone')
+    
+    # Get current date and time (use location timezone if available)
+    if location_timezone:
+        try:
+            import pytz
+            tz = pytz.timezone(location_timezone)
+            now = datetime.now(tz)
+        except:
+            now = datetime.now()
+    else:
+        now = datetime.now()
+    
+    current_date = now.strftime('%A, %B %d, %Y')
+    current_time = now.strftime('%I:%M %p')
     
     # Get readiness scores
     readiness_score = None
@@ -379,7 +394,11 @@ def export_to_google_calendar():
             print(f"[Calendar] Got timezone: {timezone}")
         except HttpError as e:
             print(f"[Calendar] HttpError {e.resp.status}: {e}")
+            error_details = str(e)
             if e.resp.status == 403:
+                # Check if it's specifically a scope issue
+                if 'insufficient' in error_details.lower() or 'scope' in error_details.lower():
+                    return jsonify({'error': 'Your Google account is connected but does not have calendar permissions. Please disconnect Google from Settings, then reconnect and make sure to approve ALL permissions including calendar access.'}), 403
                 return jsonify({'error': 'Calendar access denied. Please disconnect and reconnect your Google account, ensuring you approve calendar access on the Google consent screen.'}), 403
             elif e.resp.status == 401:
                 return jsonify({'error': 'Authorization expired. Please disconnect and reconnect your Google account.'}), 401
