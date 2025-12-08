@@ -364,6 +364,9 @@ def export_to_google_calendar():
             scopes=config.GOOGLE_SCOPES  # Add scopes so the API knows what permissions we have
         )
         
+        print(f"[Calendar] Created creds with scopes: {creds.scopes}")
+        print(f"[Calendar] Token expired: {creds.expired}, Has refresh token: {bool(creds.refresh_token)}")
+        
         # Refresh token if expired (this will also ensure scopes are validated)
         if creds.expired and creds.refresh_token:
             try:

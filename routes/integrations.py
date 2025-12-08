@@ -281,6 +281,10 @@ def callback_connect_google():
         # Get credentials
         credentials = flow.credentials
         
+        # Debug: Check what scopes the credentials actually have
+        print(f"[Google Connect] Credentials scopes: {credentials.scopes}")
+        print(f"[Google Connect] Has calendar scope: {'https://www.googleapis.com/auth/calendar.events' in (credentials.scopes or [])}")
+        
         # Verify token and get user info
         idinfo = id_token.verify_oauth2_token(
             credentials.id_token,
@@ -294,6 +298,8 @@ def callback_connect_google():
         current_user.google_id = google_id
         current_user.google_token = credentials.token
         current_user.google_refresh_token = credentials.refresh_token
+        
+        print(f"[Google Connect] Stored token for user {current_user.id}, token length: {len(credentials.token) if credentials.token else 0}")
         
         db.session.commit()
         session.pop('connect_state', None)
