@@ -387,13 +387,20 @@ def import_calendar_events():
     from models import Appointment
     from datetime import datetime, timedelta
     
+    print(f"[Calendar Import] Request from user {current_user.id}")
+    print(f"[Calendar Import] Has google_token: {bool(current_user.google_token)}")
+    print(f"[Calendar Import] Has google_id: {bool(current_user.google_id)}")
+    
     if not current_user.google_token:
-        return jsonify({'success': False, 'error': 'Google account not connected'}), 400
+        print("[Calendar Import] ERROR: No google_token found")
+        return jsonify({'success': False, 'error': 'Google account not connected. Please connect your Google account first.'}), 400
     
     try:
         from googleapiclient.discovery import build
         from google.oauth2.credentials import Credentials
         import pytz
+        
+        print(f"[Calendar Import] Parsing credentials...")
         
         # Parse stored credentials (stored as JSON)
         try:
@@ -401,11 +408,20 @@ def import_calendar_events():
             token = credentials_dict.get('token')
             refresh_token = credentials_dict.get('refresh_token')
             scopes = credentials_dict.get('scopes', [])
-        except (json.JSONDecodeError, AttributeError):
+            print(f"[Calendar Import] Parsed JSON credentials - has token: {bool(token)}, scopes: {scopes}")
+        except (json.JSONDecodeError, AttributeError) as e:
             # Fallback if token is stored as plain string
+            print(f"[Calendar Import] JSON parse failed: {e}, using plain token")
             token = current_user.google_token
             refresh_token = current_user.google_refresh_token
             scopes = None
+        
+        # Validate token exists
+        if not token:
+            print("[Calendar Import] ERROR: Token is empty after parsing")
+            return jsonify({'success': False, 'error': 'Invalid Google credentials. Please reconnect your Google account.'}), 400
+        
+        print(f"[Calendar Import] Creating credentials object...")
         
         # Create credentials from stored token
         creds = Credentials(
@@ -417,8 +433,12 @@ def import_calendar_events():
             scopes=scopes
         )
         
+        print(f"[Calendar Import] Building calendar service...")
+        
         # Build calendar service
         service = build('calendar', 'v3', credentials=creds)
+        
+        print(f"[Calendar Import] Fetching events...")
         
         # Get events for the next 30 days
         now = datetime.utcnow()
