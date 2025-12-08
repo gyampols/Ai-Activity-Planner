@@ -5,7 +5,7 @@ A Flask application that helps users plan their weekly activities based on:
 - Weather forecasts
 - Biometric data (Fitbit, Oura)
 - Personal preferences
-- AI-powered suggestions using OpenAI GPT-4
+- AI-powered suggestions using OpenAI GPT-5
 
 Modular architecture:
 - config.py: All configuration and environment variables
@@ -71,9 +71,23 @@ def create_app():
     # Exempt CSRF for AJAX endpoints (they use same-origin policy)
     csrf.exempt(planning_bp)
     
-    # Create database tables
+    # Create database tables and run migrations
     with app.app_context():
         db.create_all()
+        
+        # Run migration for manual fitness scores
+        try:
+            db.session.execute(db.text('''
+                ALTER TABLE "user" 
+                ADD COLUMN IF NOT EXISTS manual_readiness_score INTEGER,
+                ADD COLUMN IF NOT EXISTS manual_sleep_score INTEGER,
+                ADD COLUMN IF NOT EXISTS manual_score_date DATE;
+            '''))
+            db.session.commit()
+            print("✅ Database migration completed")
+        except Exception as e:
+            db.session.rollback()
+            print(f"⚠️  Migration note: {e}")
     
     return app
 
