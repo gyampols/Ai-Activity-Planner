@@ -52,6 +52,15 @@
         .navbar .brand {
             font-size: 1.3rem;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .navbar .brand img {
+            height: 40px;
+            width: 40px;
+            object-fit: contain;
         }
 
         .container {
@@ -224,6 +233,11 @@
                 font-size: 1rem;
             }
 
+            .navbar .brand img {
+                height: 30px;
+                width: 30px;
+            }
+
             .container {
                 margin: 0.5rem auto;
             }
@@ -235,7 +249,10 @@
     <nav class="navbar">
         <ul>
             <div class="nav-left">
-                <li><a href="{{ url_for('main.index') }}" class="brand">AI Activity Planner</a></li>
+                <li><a href="{{ url_for('main.index') }}" class="brand">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
+                    <span>AI Activity Planner</span>
+                </a></li>
                 <li><a href="{{ url_for('main.about') }}">About</a></li>
                 {% if current_user.is_authenticated %}
                     <li><a href="{{ url_for('activities.log') }}">Log</a></li>

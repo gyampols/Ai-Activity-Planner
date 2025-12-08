@@ -74,4 +74,3 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for Cloud Run deployment instructions.
 
 ## License
 
-MIT License
