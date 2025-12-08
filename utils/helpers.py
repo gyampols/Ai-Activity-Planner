@@ -107,7 +107,9 @@ def get_weather_forecast(location, unit='C'):
         today = datetime.now().date()
         
         for i in range(7):
-            date = datetime.fromisoformat(weather_data['daily']['time'][i])
+            # fromisoformat returns a datetime, extract just the date
+            date_str = weather_data['daily']['time'][i]
+            date = datetime.fromisoformat(date_str).date()
             
             # Parse sunrise and sunset times
             sunrise_str = weather_data['daily']['sunrise'][i]
@@ -115,16 +117,19 @@ def get_weather_forecast(location, unit='C'):
             sunrise_time = datetime.fromisoformat(sunrise_str).strftime('%I:%M %p')
             sunset_time = datetime.fromisoformat(sunset_str).strftime('%I:%M %p')
             
+            # Convert date back to datetime for strftime
+            date_dt = datetime.combine(date, datetime.min.time())
+            
             forecast.append({
-                'date': date.strftime('%A, %B %d'),
-                'date_short': date.strftime('%a %m/%d'),
+                'date': date_dt.strftime('%A, %B %d'),
+                'date_short': date_dt.strftime('%a %m/%d'),
                 'temp_max': round(weather_data['daily']['temperature_2m_max'][i]),
                 'temp_min': round(weather_data['daily']['temperature_2m_min'][i]),
                 'precipitation': weather_data['daily']['precipitation_probability_max'][i],
                 'weathercode': weather_data['daily']['weathercode'][i],
                 'sunrise': sunrise_time,
                 'sunset': sunset_time,
-                'is_today': date.date() == today
+                'is_today': date == today
             })
         
         # Return both forecast and timezone

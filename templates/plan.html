@@ -240,6 +240,16 @@
                 <span style="font-weight: 600;">Allow multiple activities per day</span>
             </label>
             
+            <label for="last-activity" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Last Activity Completed (Optional)
+            </label>
+            <input 
+                type="text" 
+                id="last-activity" 
+                placeholder="e.g., 5k run, yoga session, strength training"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; margin-bottom: 1rem;"
+            >
+            
             <label for="extra-info" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
                 Additional Information (Optional)
             </label>
@@ -292,6 +302,7 @@
         const calendarContainer = document.getElementById('calendar-container');
         const calendarGrid = document.getElementById('calendar-grid');
         const extraInfo = document.getElementById('extra-info')?.value || '';
+        const lastActivity = document.getElementById('last-activity')?.value || '';
         const allowMultiple = document.getElementById('allow-multiple-activities')?.checked || false;
         
         btn.disabled = true;
@@ -307,6 +318,7 @@
                 },
                 body: JSON.stringify({
                     extra_info: extraInfo,
+                    last_activity: lastActivity,
                     allow_multiple_activities: allowMultiple
                 })
             });

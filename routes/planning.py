@@ -66,6 +66,7 @@ def generate_plan():
     try:
         request_data = request.get_json() or {}
         extra_info = request_data.get('extra_info', '').strip()
+        last_activity = request_data.get('last_activity', '').strip()
         allow_multiple = request_data.get('allow_multiple_activities', False)
     except:
         extra_info = ''
@@ -107,7 +108,7 @@ def generate_plan():
     # Build prompt
     prompt = _build_planning_prompt(
         activities, now, current_date, current_time, 
-        weather_forecast, readiness_score, sleep_score, extra_info, allow_multiple
+        weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple
     )
     
     try:
@@ -148,7 +149,7 @@ def generate_plan():
 
 
 def _build_planning_prompt(activities, now, current_date, current_time, 
-                           weather_forecast, readiness_score, sleep_score, extra_info, allow_multiple=False):
+                           weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple=False):
     """Build the comprehensive prompt for OpenAI."""
     # Prepare activity information
     activity_info = []
@@ -209,6 +210,11 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
                 apt_info += f" - {apt.description}"
             prompt += apt_info + "\n"
         prompt += "\nIMPORTANT: Work activities around these appointments. Do NOT schedule conflicting activities.\n"
+    
+    # Add last activity information
+    if last_activity:
+        prompt += f"\nLast Activity Completed:\n{last_activity}\n"
+        prompt += "Consider this when planning to ensure proper recovery and variety.\n"
     
     # Add extra information
     if extra_info:
@@ -277,9 +283,16 @@ Please provide a day-by-day plan starting from today in the following JSON forma
 Use the following date keys (these are the actual dates):
 """
     for date_key, day_name in date_keys:
-        prompt += f'  "{date_key}": {{"day_name": "{day_name}", "activity": "Activity name or Rest", "notes": "Brief explanation"}}\n'
+        prompt += f'  "{date_key}": {{"day_name": "{day_name}", "activity": "Activity name or Rest", "time": "HH:MM", "duration_minutes": 60, "notes": "Brief explanation"}}\n'
     
-    prompt += "\nReturn only the JSON object with these exact date keys.\n"
+    prompt += """
+IMPORTANT: For each activity:
+- Include "time" in 24-hour format (HH:MM) based on the activity's preferred time or suitable time of day
+- Include "duration_minutes" as a number (e.g., 30, 60, 90) based on typical activity duration
+- For rest days, you can omit time and duration or set them to null
+
+Return only the JSON object with these exact date keys.
+"""
     
     return prompt
 
@@ -452,9 +465,21 @@ def export_to_google_calendar():
                     print(f"[Calendar] Skipping rest day: {date_key}")
                     continue
                 
-                # Create start and end times (default to 9 AM - 10 AM)
-                start_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=9))
-                end_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=10))
+                # Get time and duration from plan, or use defaults
+                activity_time = day_data.get('time', '09:00')
+                duration_minutes = day_data.get('duration_minutes', 60)
+                
+                # Parse the time
+                try:
+                    hour, minute = map(int, activity_time.split(':'))
+                    start_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=hour, minute=minute))
+                except (ValueError, AttributeError):
+                    # Default to 9 AM if time parsing fails
+                    start_datetime = datetime.combine(event_date, datetime.min.time().replace(hour=9))
+                
+                # Calculate end time based on duration
+                end_datetime = start_datetime + timedelta(minutes=duration_minutes)
+                print(f"[Calendar] Event time: {activity_time}, duration: {duration_minutes} min")
                 
                 # Localize to user's timezone
                 start_datetime = tz.localize(start_datetime)
