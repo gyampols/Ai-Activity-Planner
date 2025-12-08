@@ -383,6 +383,22 @@ def export_to_google_calendar():
         
         print(f"[Calendar] Token expired: {creds.expired}, Has refresh token: {bool(creds.refresh_token)}")
         
+        # Try to introspect the token to see what scopes it actually has
+        try:
+            import requests as req
+            token_info_url = f"https://oauth2.googleapis.com/tokeninfo?access_token={creds.token}"
+            token_response = req.get(token_info_url, timeout=5)
+            if token_response.status_code == 200:
+                token_info = token_response.json()
+                actual_scopes = token_info.get('scope', '').split()
+                print(f"[Calendar] Token info from Google: scopes={actual_scopes}")
+                if 'https://www.googleapis.com/auth/calendar.events' not in actual_scopes:
+                    print(f"[Calendar] ERROR: Token does NOT have calendar scope! Only has: {actual_scopes}")
+            else:
+                print(f"[Calendar] Token introspection failed: {token_response.status_code}")
+        except Exception as e:
+            print(f"[Calendar] Token introspection error: {e}")
+        
         # Refresh token if expired (this will also ensure scopes are validated)
         if creds.expired and creds.refresh_token:
             try:
