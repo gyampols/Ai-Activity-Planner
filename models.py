@@ -39,6 +39,11 @@ class User(UserMixin, db.Model):
     manual_sleep_score = db.Column(db.Integer, nullable=True)  # 0-100
     manual_score_date = db.Column(db.Date, nullable=True)  # Date scores were last updated
     
+    # Subscription tier system
+    subscription_tier = db.Column(db.String(20), default='free_tier', nullable=False)  # free_tier, paid_tier, admin
+    plan_generations_count = db.Column(db.Integer, default=0, nullable=False)  # Count of plans generated this week
+    plan_generation_reset_date = db.Column(db.Date, nullable=True)  # Date when weekly counter resets
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     activities = db.relationship('Activity', backref='user', lazy=True, cascade='all, delete-orphan')
     appointments = db.relationship('Appointment', backref='user', lazy=True, cascade='all, delete-orphan')

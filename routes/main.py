@@ -121,6 +121,51 @@ def settings():
     return render_template('settings.html')
 
 
+@main_bp.route('/update_subscription', methods=['POST'])
+@login_required
+def update_subscription():
+    """Update user's subscription tier."""
+    try:
+        new_tier = request.form.get('new_tier', '').strip()
+        
+        # Validate tier
+        valid_tiers = ['free_tier', 'paid_tier']
+        if new_tier not in valid_tiers:
+            flash('Invalid subscription tier.', 'danger')
+            return redirect(url_for('main.settings'))
+        
+        # Prevent users from setting themselves to admin
+        if current_user.subscription_tier != 'admin' and new_tier not in valid_tiers:
+            flash('You cannot change to admin tier.', 'danger')
+            return redirect(url_for('main.settings'))
+        
+        # Admin users cannot downgrade themselves
+        if current_user.subscription_tier == 'admin':
+            flash('Admin accounts cannot change subscription tiers.', 'danger')
+            return redirect(url_for('main.settings'))
+        
+        old_tier = current_user.subscription_tier
+        current_user.subscription_tier = new_tier
+        
+        # Reset generation count when upgrading
+        if new_tier == 'paid_tier' and old_tier == 'free_tier':
+            current_user.plan_generations_count = 0
+        
+        db.session.commit()
+        
+        if new_tier == 'paid_tier':
+            flash('Successfully upgraded to Paid Plan! You now have 20 generations per week.', 'success')
+        else:
+            flash('Successfully changed to Free Plan. You now have 3 generations per week.', 'success')
+        
+        return redirect(url_for('main.settings'))
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating subscription: {str(e)}', 'danger')
+        return redirect(url_for('main.settings'))
+
+
 @main_bp.route('/delete_account', methods=['POST'])
 @login_required
 def delete_account():

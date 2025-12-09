@@ -94,6 +94,43 @@ def update_manual_scores():
 @login_required
 def generate_plan():
     """Generate an AI-powered weekly activity plan."""
+    from datetime import date
+    
+    # Check subscription tier limits
+    today = date.today()
+    
+    # Reset weekly counter if needed (resets every Monday)
+    if current_user.plan_generation_reset_date is None or current_user.plan_generation_reset_date < today:
+        # Find next Monday (or today if it's Monday)
+        days_until_monday = (7 - today.weekday()) % 7
+        if days_until_monday == 0 and current_user.plan_generation_reset_date != today:
+            days_until_monday = 7
+        next_reset = today + timedelta(days=days_until_monday if days_until_monday > 0 else 7)
+        current_user.plan_generation_reset_date = next_reset
+        current_user.plan_generations_count = 0
+        db.session.commit()
+    
+    # Check tier-based limits
+    tier_limits = {
+        'free_tier': 3,
+        'paid_tier': 20,
+        'admin': float('inf')  # Unlimited
+    }
+    
+    user_tier = current_user.subscription_tier or 'free_tier'
+    limit = tier_limits.get(user_tier, 3)
+    
+    if current_user.plan_generations_count >= limit:
+        days_until_reset = (current_user.plan_generation_reset_date - today).days
+        return jsonify({
+            'error': f'You have reached your weekly limit of {limit} plan generations. Your limit resets in {days_until_reset} day(s). Consider upgrading to paid tier for more generations!',
+            'limit_reached': True,
+            'current_tier': user_tier,
+            'generations_used': current_user.plan_generations_count,
+            'limit': limit,
+            'reset_date': current_user.plan_generation_reset_date.isoformat()
+        }), 429
+    
     activities = Activity.query.filter_by(user_id=current_user.id).all()
     
     if not activities:
@@ -204,11 +241,20 @@ DECISION PRINCIPLES:
             cleaned_text = cleaned_text.strip()
             
             plan_json = json.loads(cleaned_text)
+            
+            # Increment generation counter on successful plan creation
+            current_user.plan_generations_count += 1
+            db.session.commit()
+            
             return jsonify({'plan': plan_json, 'structured': True})
         except Exception as e:
             print(f"JSON parsing error: {e}")
             print(f"Plan text: {plan_text}")
             # If not JSON, return as text
+            # Still increment counter as plan was generated
+            current_user.plan_generations_count += 1
+            db.session.commit()
+            
             return jsonify({'plan': plan_text, 'structured': False})
     
     except Exception as e:

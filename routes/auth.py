@@ -99,6 +99,13 @@ def signup():
         # Create user
         user = User(username=username, email=email)
         user.set_password(password)
+        
+        # Set subscription tier (admin for gregyampolsky@gmail.com, free_tier for everyone else)
+        if email.lower() == 'gregyampolsky@gmail.com':
+            user.subscription_tier = 'admin'
+        else:
+            user.subscription_tier = 'free_tier'
+        
         db.session.add(user)
         db.session.commit()
         
@@ -233,6 +240,13 @@ def callback_google():
                     google_token=credentials_json,
                     google_refresh_token=credentials.refresh_token
                 )
+                
+                # Set subscription tier (admin for gregyampolsky@gmail.com, free_tier for everyone else)
+                if email.lower() == 'gregyampolsky@gmail.com':
+                    user.subscription_tier = 'admin'
+                else:
+                    user.subscription_tier = 'free_tier'
+                
                 db.session.add(user)
         else:
             # Update tokens

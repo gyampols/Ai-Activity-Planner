@@ -106,6 +106,112 @@
         </form>
     </section>
     
+    <!-- Subscription Management -->
+    <section class="settings-section">
+        <h2>Subscription Plan</h2>
+        <div class="subscription-info">
+            <div class="current-plan-card">
+                <div class="plan-header">
+                    <h3>
+                        {% if current_user.subscription_tier == 'admin' %}
+                            👑 Admin Plan
+                        {% elif current_user.subscription_tier == 'paid_tier' %}
+                            ⭐ Paid Plan
+                        {% else %}
+                            🆓 Free Plan
+                        {% endif %}
+                    </h3>
+                    <span class="plan-badge {{ current_user.subscription_tier or 'free_tier' }}">
+                        {{ (current_user.subscription_tier or 'free_tier').replace('_', ' ').title() }}
+                    </span>
+                </div>
+                
+                <div class="plan-usage">
+                    {% if current_user.subscription_tier == 'admin' %}
+                        <p><strong>Weekly Plan Generations:</strong> Unlimited ♾️</p>
+                        <p class="usage-note">You have unlimited access to all features.</p>
+                    {% else %}
+                        {% set limit = 20 if current_user.subscription_tier == 'paid_tier' else 3 %}
+                        {% set used = current_user.plan_generations_count or 0 %}
+                        {% set remaining = limit - used %}
+                        
+                        <p><strong>Weekly Plan Generations:</strong> {{ used }} / {{ limit }} used</p>
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill" style="width: {{ (used / limit * 100) | int }}%"></div>
+                        </div>
+                        <p class="usage-note">
+                            {% if remaining > 0 %}
+                                {{ remaining }} generation{{ 's' if remaining != 1 else '' }} remaining this week.
+                            {% else %}
+                                You've reached your weekly limit.
+                            {% endif %}
+                            {% if current_user.plan_generation_reset_date %}
+                                Resets on {{ current_user.plan_generation_reset_date.strftime('%B %d, %Y') }}.
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </div>
+                
+                <div class="plan-features">
+                    <h4>Your Current Features:</h4>
+                    <ul>
+                        {% if current_user.subscription_tier == 'admin' %}
+                            <li>✅ Unlimited AI plan generations</li>
+                            <li>✅ All integrations (Fitbit, Oura, Google)</li>
+                            <li>✅ Priority support</li>
+                            <li>✅ Advanced analytics</li>
+                            <li>✅ Admin access</li>
+                        {% elif current_user.subscription_tier == 'paid_tier' %}
+                            <li>✅ 20 AI plan generations per week</li>
+                            <li>✅ All integrations (Fitbit, Oura, Google)</li>
+                            <li>✅ Weather-based planning</li>
+                            <li>✅ Calendar sync</li>
+                            <li>✅ Priority support</li>
+                        {% else %}
+                            <li>✅ 3 AI plan generations per week</li>
+                            <li>✅ All integrations (Fitbit, Oura, Google)</li>
+                            <li>✅ Weather-based planning</li>
+                            <li>✅ Calendar sync</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                {% if current_user.subscription_tier != 'admin' %}
+                    <div class="plan-actions">
+                        {% if current_user.subscription_tier == 'paid_tier' %}
+                            <button type="button" class="btn btn-secondary" onclick="showDowngradeModal()">Downgrade to Free</button>
+                        {% else %}
+                            <button type="button" class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Paid Plan</button>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            {% if current_user.subscription_tier != 'admin' and current_user.subscription_tier != 'paid_tier' %}
+            <div class="upgrade-benefits">
+                <h4>🚀 Upgrade to Paid Plan</h4>
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="benefit-icon">📊</div>
+                        <h5>20 Generations/Week</h5>
+                        <p>Generate up to 20 AI-powered activity plans each week</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">⚡</div>
+                        <h5>Priority Support</h5>
+                        <p>Get faster responses to your questions and issues</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎯</div>
+                        <h5>All Features</h5>
+                        <p>Full access to all current and future features</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    
     <!-- Connected Accounts -->
     <section class="settings-section">
         <h2>Connected Accounts</h2>
@@ -195,6 +301,49 @@
             <button type="button" class="btn btn-danger" onclick="confirmDeleteAccount()">Delete Account</button>
         </div>
     </section>
+</div>
+
+<!-- Upgrade Modal -->
+<div id="upgradeModal" class="modal">
+    <div class="modal-content">
+        <h2>Upgrade to Paid Plan</h2>
+        <p>Upgrade to unlock more features:</p>
+        <ul>
+            <li>20 AI plan generations per week (vs 3 on free)</li>
+            <li>Priority support</li>
+            <li>Early access to new features</li>
+        </ul>
+        <p><strong>Price:</strong> Contact admin for pricing</p>
+        <form method="POST" action="{{ url_for('main.update_subscription') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="new_tier" value="paid_tier"/>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeUpgradeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Confirm Upgrade</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Downgrade Modal -->
+<div id="downgradeModal" class="modal">
+    <div class="modal-content">
+        <h2>Downgrade to Free Plan</h2>
+        <p>Are you sure you want to downgrade? You will:</p>
+        <ul>
+            <li>Be limited to 3 AI plan generations per week</li>
+            <li>Lose priority support</li>
+            <li>Keep all your data and activities</li>
+        </ul>
+        <form method="POST" action="{{ url_for('main.update_subscription') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="new_tier" value="free_tier"/>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeDowngradeModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">Confirm Downgrade</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Delete Account Confirmation Modal -->
@@ -354,6 +503,167 @@
         font-weight: 600;
     }
     
+    /* Subscription Section */
+    .subscription-info {
+        max-width: 800px;
+    }
+    
+    .current-plan-card {
+        padding: 2rem;
+        border: 2px solid #ddd;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        margin-bottom: 2rem;
+    }
+    
+    .plan-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .plan-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #2c3e50;
+    }
+    
+    .plan-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+    }
+    
+    .plan-badge.free_tier {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    
+    .plan-badge.paid_tier {
+        background-color: #ffc107;
+        color: #000;
+    }
+    
+    .plan-badge.admin {
+        background-color: #9c27b0;
+        color: white;
+    }
+    
+    .plan-usage {
+        margin-bottom: 1.5rem;
+    }
+    
+    .plan-usage p {
+        margin: 0.5rem 0;
+        color: #2c3e50;
+    }
+    
+    .usage-bar {
+        width: 100%;
+        height: 24px;
+        background-color: #e9ecef;
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 0.75rem 0;
+        border: 1px solid #dee2e6;
+    }
+    
+    .usage-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 8px;
+        color: white;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+    
+    .usage-note {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin: 0.5rem 0;
+    }
+    
+    .plan-features {
+        margin-bottom: 1.5rem;
+    }
+    
+    .plan-features h4 {
+        margin: 0 0 0.75rem 0;
+        color: #2c3e50;
+        font-size: 1.125rem;
+    }
+    
+    .plan-features ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .plan-features li {
+        padding: 0.5rem 0;
+        color: #495057;
+        font-size: 0.95rem;
+    }
+    
+    .plan-actions {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .upgrade-benefits {
+        padding: 2rem;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-radius: 12px;
+        border: 2px solid #2196f3;
+    }
+    
+    .upgrade-benefits h4 {
+        margin: 0 0 1.5rem 0;
+        color: #1976d2;
+        font-size: 1.25rem;
+    }
+    
+    .benefits-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .benefit-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .benefit-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .benefit-card h5 {
+        margin: 0 0 0.5rem 0;
+        color: #2c3e50;
+        font-size: 1.125rem;
+    }
+    
+    .benefit-card p {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
     /* Danger Zone */
     .danger-zone {
         background: #fff5f5;
@@ -474,6 +784,22 @@
 </style>
 
 <script>
+    function showUpgradeModal() {
+        document.getElementById('upgradeModal').classList.add('show');
+    }
+    
+    function closeUpgradeModal() {
+        document.getElementById('upgradeModal').classList.remove('show');
+    }
+    
+    function showDowngradeModal() {
+        document.getElementById('downgradeModal').classList.add('show');
+    }
+    
+    function closeDowngradeModal() {
+        document.getElementById('downgradeModal').classList.remove('show');
+    }
+    
     function confirmDeleteAccount() {
         document.getElementById('deleteAccountModal').classList.add('show');
     }
@@ -484,9 +810,16 @@
     
     // Close modal when clicking outside
     window.onclick = function(event) {
-        const modal = document.getElementById('deleteAccountModal');
-        if (event.target === modal) {
+        const deleteModal = document.getElementById('deleteAccountModal');
+        const upgradeModal = document.getElementById('upgradeModal');
+        const downgradeModal = document.getElementById('downgradeModal');
+        
+        if (event.target === deleteModal) {
             closeDeleteAccountModal();
+        } else if (event.target === upgradeModal) {
+            closeUpgradeModal();
+        } else if (event.target === downgradeModal) {
+            closeDowngradeModal();
         }
     }
 </script>

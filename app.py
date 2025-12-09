@@ -78,16 +78,34 @@ def create_app():
     with app.app_context():
         db.create_all()
         
-        # Run migration for manual fitness scores
+        # Run migrations
         try:
+            # Migration 1: Manual fitness scores
             db.session.execute(db.text('''
                 ALTER TABLE "user" 
                 ADD COLUMN IF NOT EXISTS manual_readiness_score INTEGER,
                 ADD COLUMN IF NOT EXISTS manual_sleep_score INTEGER,
                 ADD COLUMN IF NOT EXISTS manual_score_date DATE;
             '''))
+            
+            # Migration 2: Subscription tiers
+            db.session.execute(db.text('''
+                ALTER TABLE "user" 
+                ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) DEFAULT 'free_tier',
+                ADD COLUMN IF NOT EXISTS plan_generations_count INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS plan_generation_reset_date DATE;
+            '''))
+            
+            # Set admin tier for gregyampolsky@gmail.com
+            db.session.execute(db.text('''
+                UPDATE "user"
+                SET subscription_tier = 'admin'
+                WHERE LOWER(email) = 'gregyampolsky@gmail.com'
+                AND subscription_tier IS NULL;
+            '''))
+            
             db.session.commit()
-            print("✅ Database migration completed")
+            print("✅ Database migrations completed")
         except Exception as e:
             db.session.rollback()
             print(f"⚠️  Migration note: {e}")
