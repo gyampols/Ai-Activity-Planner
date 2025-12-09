@@ -9,6 +9,7 @@
         <p style="color: #666; margin-bottom: 2rem;">Enter your email address and we'll send you a new verification link.</p>
         
         <form method="POST" action="{{ url_for('auth.resend_verification') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required placeholder="you@example.com">

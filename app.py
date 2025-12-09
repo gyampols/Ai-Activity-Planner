@@ -76,6 +76,9 @@ def create_app():
     # Exempt calendar import endpoint for AJAX calls
     csrf.exempt(app.view_functions['integrations.import_calendar_events'])
     
+    # Exempt admin AJAX endpoint for test flag toggle
+    csrf.exempt(app.view_functions['admin.toggle_test_flag'])
+    
     # Create database tables and run migrations
     with app.app_context():
         db.create_all()
@@ -117,10 +120,11 @@ def create_app():
             '''))
             
             # Mark existing users as email verified (grandfather clause)
+            # Only for users created before December 9, 2025 (when email verification was added)
             db.session.execute(db.text('''
                 UPDATE "user"
                 SET email_verified = TRUE
-                WHERE email_verified = FALSE AND created_at < NOW();
+                WHERE email_verified = FALSE AND created_at < '2025-12-09';
             '''))
             
             db.session.commit()

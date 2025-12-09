@@ -143,7 +143,12 @@ def delete_user():
 def toggle_test_flag():
     """Toggle a user's test flag."""
     try:
-        user_id = request.form.get('user_id')
+        # Get user_id from JSON body
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        user_id = data.get('user_id')
         
         if not user_id:
             return jsonify({'success': False, 'error': 'Missing user ID'}), 400
