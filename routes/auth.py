@@ -100,8 +100,8 @@ def signup():
         user = User(username=username, email=email)
         user.set_password(password)
         
-        # Set subscription tier (admin for gregyampolsky@gmail.com, free_tier for everyone else)
-        if email.lower() == 'gregyampolsky@gmail.com':
+        # Set subscription tier (admin for gregyampolsky accounts, free_tier for everyone else)
+        if email.lower() == 'gregyampolsky@gmail.com' or username.lower() == 'gregyampolsky':
             user.subscription_tier = 'admin'
         else:
             user.subscription_tier = 'free_tier'
@@ -241,8 +241,8 @@ def callback_google():
                     google_refresh_token=credentials.refresh_token
                 )
                 
-                # Set subscription tier (admin for gregyampolsky@gmail.com, free_tier for everyone else)
-                if email.lower() == 'gregyampolsky@gmail.com':
+                # Set subscription tier (admin for gregyampolsky accounts, free_tier for everyone else)
+                if email.lower() == 'gregyampolsky@gmail.com' or username.lower() == 'gregyampolsky':
                     user.subscription_tier = 'admin'
                 else:
                     user.subscription_tier = 'free_tier'

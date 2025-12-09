@@ -98,12 +98,11 @@ def create_app():
                 ADD COLUMN IF NOT EXISTS plan_generation_reset_date DATE;
             '''))
             
-            # Set admin tier for gregyampolsky@gmail.com
+            # Set admin tier for gregyampolsky accounts
             db.session.execute(db.text('''
                 UPDATE "user"
                 SET subscription_tier = 'admin'
-                WHERE LOWER(email) = 'gregyampolsky@gmail.com'
-                AND subscription_tier IS NULL;
+                WHERE (LOWER(email) = 'gregyampolsky@gmail.com' OR LOWER(username) = 'gregyampolsky');
             '''))
             
             db.session.commit()
