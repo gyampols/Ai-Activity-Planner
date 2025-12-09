@@ -96,7 +96,7 @@
                         </td>
                         <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
                         <td>
-                            {% if user.id != current_user.id %}
+                            {% if user.id != current_user.id and user.username.lower() != 'gregyampolsky' and user.email.lower() != 'gregyampolsky@gmail.com' %}
                             <div class="action-buttons">
                                 <button onclick="showChangeTierModal({{ user.id }}, '{{ user.username }}', '{{ user.subscription_tier or 'free_tier' }}')" 
                                         class="btn-small btn-primary">
@@ -107,6 +107,8 @@
                                     Delete
                                 </button>
                             </div>
+                            {% elif user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com' %}
+                            <span style="color: #9c27b0; font-size: 0.875rem; font-weight: 600;">🔒 Protected</span>
                             {% else %}
                             <span style="color: #999; font-size: 0.875rem;">—</span>
                             {% endif %}

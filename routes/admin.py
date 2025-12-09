@@ -75,6 +75,11 @@ def update_user_tier():
             flash('You cannot change your own subscription tier.', 'danger')
             return redirect(url_for('admin.admin_panel'))
         
+        # Prevent changing gregyampolsky account tier
+        if user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com':
+            flash('The gregyampolsky account tier cannot be changed.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
         old_tier = user.subscription_tier or 'free_tier'
         user.subscription_tier = new_tier
         
@@ -112,6 +117,11 @@ def delete_user():
         # Prevent admin from deleting themselves
         if user.id == current_user.id:
             flash('You cannot delete your own account from the admin panel.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Prevent deleting gregyampolsky account
+        if user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com':
+            flash('The gregyampolsky account cannot be deleted.', 'danger')
             return redirect(url_for('admin.admin_panel'))
         
         username = user.username
