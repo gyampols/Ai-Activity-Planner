@@ -349,6 +349,7 @@ CRITICAL SCHEDULING RULES:
 4. **Activity Distribution**:
    - Spread intensity levels across the week (no back-to-back high-intensity)
    - Honor preferred days/times when specified
+   - Keep in mind recovery needs of different muscle groups and activity types to avoid overtraining any specific body part.
    - Match activities to optimal weather conditions
 {multiple_activities_instruction.replace('13.', '   -')}
 
