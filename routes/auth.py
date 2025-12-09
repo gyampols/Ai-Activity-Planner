@@ -32,14 +32,17 @@ def login():
         return redirect(url_for('main.index'))
     
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        username_or_email = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         
-        if not username or not password:
-            flash('Username and password are required!', 'error')
+        if not username_or_email or not password:
+            flash('Username/email and password are required!', 'error')
             return render_template('login.html')
         
-        user = User.query.filter_by(username=username).first()
+        # Try to find user by username or email
+        user = User.query.filter(
+            (User.username == username_or_email) | (User.email == username_or_email)
+        ).first()
         
         if user and user.check_password(password):
             # Check if email is verified
@@ -54,7 +57,7 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('main.index'))
         else:
-            flash('Invalid username or password', 'error')
+            flash('Invalid username/email or password', 'error')
     
     return render_template('login.html')
 
