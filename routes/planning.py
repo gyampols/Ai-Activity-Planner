@@ -302,12 +302,12 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
         
         if readiness_score:
             prompt += f"- Readiness score: {readiness_score}/100"
-            if readiness_score < 60:
-                prompt += " (Low - prioritize recovery and lighter activities today)\n"
-            elif readiness_score < 80:
-                prompt += " (Moderate - balanced activity load today)\n"
+            if readiness_score < 30:
+                prompt += " (Low - prioritize recovery with lower intensity exercises like stretching and yoga)\n"
+            elif readiness_score < 65:
+                prompt += " (Moderate - heart rate and recent sleep are about usual, body is balancing stress with recovery)\n"
             else:
-                prompt += " (High - can handle intense activities today)\n"
+                prompt += " (High - body is well-rested and recovered, can handle intense activities)\n"
         
         if sleep_score:
             prompt += f"- Sleep score: {sleep_score}%"

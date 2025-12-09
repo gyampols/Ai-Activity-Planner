@@ -136,11 +136,10 @@ If you don't have a fitness tracker, scroll down on the Log page to find the "Ma
   - 70-89: Good sleep
   - 50-69: Fair sleep
   - Below 50: Poor sleep
-- **Readiness Score (0-100)**: How ready you feel for activity today
-  - 90-100: Fully energized
-  - 70-89: Good energy
-  - 50-69: Moderate energy
-  - Below 50: Low energy
+- **Readiness Score (0-100)**: How ready you feel for activity today (based on Fitbit standards)
+  - 65-100 (High): Body is well-rested and recovered
+  - 30-64 (Moderate): Heart rate and recent sleep are about usual, body is balancing stress with recovery
+  - 1-29 (Low): Prioritize recovery with lower intensity exercises like stretching and yoga
 ![fitbit](static/Images/manualScores.png)
 Use the sliders to adjust your scores and click "Save Manual Scores". Update these daily for best results!
 
