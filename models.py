@@ -44,6 +44,18 @@ class User(UserMixin, db.Model):
     plan_generations_count = db.Column(db.Integer, default=0, nullable=False)  # Count of plans generated this week
     plan_generation_reset_date = db.Column(db.Date, nullable=True)  # Date when weekly counter resets
     
+    # Admin flags
+    test_flag = db.Column(db.Boolean, default=False, nullable=False)  # Mark account as test user
+    
+    # Email verification
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)  # Whether email is verified
+    verification_token = db.Column(db.String(255), nullable=True)  # Token for email verification
+    verification_token_expiry = db.Column(db.DateTime, nullable=True)  # When verification token expires
+    
+    # Password reset
+    reset_token = db.Column(db.String(255), nullable=True)  # Token for password reset
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)  # When reset token expires
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     activities = db.relationship('Activity', backref='user', lazy=True, cascade='all, delete-orphan')
     appointments = db.relationship('Appointment', backref='user', lazy=True, cascade='all, delete-orphan')

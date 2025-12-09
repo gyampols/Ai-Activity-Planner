@@ -135,3 +135,81 @@ def delete_user():
         db.session.rollback()
         flash(f'Error deleting user: {str(e)}', 'danger')
         return redirect(url_for('admin.admin_panel'))
+
+
+@admin_bp.route('/admin/toggle_test_flag', methods=['POST'])
+@login_required
+@admin_required
+def toggle_test_flag():
+    """Toggle a user's test flag."""
+    try:
+        user_id = request.form.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Missing user ID'}), 400
+        
+        user = User.query.get(int(user_id))
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Prevent changing gregyampolsky account
+        if user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com':
+            return jsonify({'success': False, 'error': 'Cannot modify gregyampolsky account'}), 403
+        
+        # Toggle test flag
+        user.test_flag = not user.test_flag
+        db.session.commit()
+        
+        return jsonify({'success': True, 'test_flag': user.test_flag})
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/admin/update_user_email', methods=['POST'])
+@login_required
+@admin_required
+def update_user_email():
+    """Update a user's email address."""
+    try:
+        user_id = request.form.get('user_id')
+        new_email = request.form.get('new_email', '').strip()
+        
+        if not user_id or not new_email:
+            flash('Missing user ID or email.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Validate email format
+        if '@' not in new_email or len(new_email) > 120:
+            flash('Invalid email format.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        user = User.query.get(int(user_id))
+        if not user:
+            flash('User not found.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Prevent changing gregyampolsky account
+        if user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com':
+            flash('Cannot modify gregyampolsky account email.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=new_email).first()
+        if existing_user and existing_user.id != user.id:
+            flash('This email is already in use by another account.', 'danger')
+            return redirect(url_for('admin.admin_panel'))
+        
+        old_email = user.email
+        user.email = new_email
+        user.email_verified = True  # Admin changes don't require verification
+        db.session.commit()
+        
+        flash(f'Successfully changed {user.username}\'s email from {old_email} to {new_email}.', 'success')
+        return redirect(url_for('admin.admin_panel'))
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating email: {str(e)}', 'danger')
+        return redirect(url_for('admin.admin_panel'))

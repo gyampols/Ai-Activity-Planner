@@ -2,6 +2,7 @@
 Authentication routes including login, signup, and OAuth flows.
 """
 import json
+from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from google_auth_oauthlib.flow import Flow
@@ -11,6 +12,7 @@ from urllib.parse import urlparse, urljoin
 
 from models import db, User
 from config import config
+from utils.email import send_verification_email, send_password_reset_email, resend_verification_email
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -40,6 +42,11 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
+            # Check if email is verified
+            if not user.email_verified:
+                flash('Please verify your email before logging in. Check your inbox for the verification link.', 'warning')
+                return render_template('login.html')
+            
             login_user(user)
             flash('Logged in successfully!', 'success')
             next_page = request.args.get('next')
@@ -103,13 +110,22 @@ def signup():
         # Set subscription tier (admin for gregyampolsky accounts, free_tier for everyone else)
         if email.lower() == 'gregyampolsky@gmail.com' or username.lower() == 'gregyampolsky':
             user.subscription_tier = 'admin'
+            user.email_verified = True  # Auto-verify admin accounts
         else:
             user.subscription_tier = 'free_tier'
+            user.email_verified = False  # Require verification for regular users
         
         db.session.add(user)
         db.session.commit()
         
-        flash('Account created successfully! Please log in.', 'success')
+        # Send verification email for non-admin users
+        if not user.email_verified:
+            app_url = request.url_root.rstrip('/')
+            send_verification_email(user, app_url)
+            flash('Account created! Please check your email to verify your account before logging in.', 'success')
+        else:
+            flash('Account created successfully! Please log in.', 'success')
+        
         return redirect(url_for('auth.login'))
     
     return render_template('signup.html')
@@ -238,7 +254,8 @@ def callback_google():
                     email=email,
                     google_id=google_id,
                     google_token=credentials_json,
-                    google_refresh_token=credentials.refresh_token
+                    google_refresh_token=credentials.refresh_token,
+                    email_verified=True  # Google OAuth means email is verified
                 )
                 
                 # Set subscription tier (admin for gregyampolsky accounts, free_tier for everyone else)
@@ -263,3 +280,134 @@ def callback_google():
         print(f"Google OAuth error: {e}")
         flash('Failed to authenticate with Google. Please try again.', 'error')
         return redirect(url_for('auth.login'))
+
+
+@auth_bp.route('/verify_email')
+def verify_email():
+    """Verify user email with token."""
+    token = request.args.get('token')
+    
+    if not token:
+        flash('Invalid verification link.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    # Find user with this token
+    user = User.query.filter_by(verification_token=token).first()
+    
+    if not user:
+        flash('Invalid or expired verification token.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    # Check if token is expired
+    if user.verification_token_expiry and user.verification_token_expiry < datetime.utcnow():
+        flash('Verification link has expired. Please request a new one.', 'danger')
+        return redirect(url_for('auth.resend_verification'))
+    
+    # Verify the email
+    user.email_verified = True
+    user.verification_token = None
+    user.verification_token_expiry = None
+    db.session.commit()
+    
+    flash('Email verified successfully! You can now log in.', 'success')
+    return redirect(url_for('auth.login'))
+
+
+@auth_bp.route('/resend_verification', methods=['GET', 'POST'])
+def resend_verification():
+    """Resend verification email."""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        
+        if not email:
+            flash('Please provide your email address.', 'danger')
+            return render_template('resend_verification.html')
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            # Don't reveal if email exists
+            flash('If this email is registered, you will receive a verification link.', 'success')
+            return redirect(url_for('auth.login'))
+        
+        if user.email_verified:
+            flash('This email is already verified. You can log in.', 'success')
+            return redirect(url_for('auth.login'))
+        
+        # Send verification email
+        app_url = request.url_root.rstrip('/')
+        resend_verification_email(user, app_url)
+        
+        flash('Verification email sent! Please check your inbox.', 'success')
+        return redirect(url_for('auth.login'))
+    
+    return render_template('resend_verification.html')
+
+
+@auth_bp.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    """Request password reset."""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        
+        if not email:
+            flash('Please provide your email address.', 'danger')
+            return render_template('forgot_password.html')
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if user and user.password_hash:  # Only for non-OAuth users
+            # Send reset email
+            app_url = request.url_root.rstrip('/')
+            send_password_reset_email(user, app_url)
+        
+        # Don't reveal if email exists
+        flash('If this email is registered, you will receive a password reset link.', 'success')
+        return redirect(url_for('auth.login'))
+    
+    return render_template('forgot_password.html')
+
+
+@auth_bp.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    """Reset password with token."""
+    token = request.args.get('token')
+    
+    if not token:
+        flash('Invalid reset link.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    # Find user with this token
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user:
+        flash('Invalid or expired reset token.', 'danger')
+        return redirect(url_for('auth.login'))
+    
+    # Check if token is expired
+    if user.reset_token_expiry and user.reset_token_expiry < datetime.utcnow():
+        flash('Reset link has expired. Please request a new one.', 'danger')
+        return redirect(url_for('auth.forgot_password'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not password or len(password) < 6:
+            flash('Password must be at least 6 characters long.', 'danger')
+            return render_template('reset_password.html', token=token)
+        
+        if password != confirm_password:
+            flash('Passwords do not match.', 'danger')
+            return render_template('reset_password.html', token=token)
+        
+        # Reset password
+        user.set_password(password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        flash('Password reset successfully! You can now log in.', 'success')
+        return redirect(url_for('auth.login'))
+    
+    return render_template('reset_password.html', token=token)

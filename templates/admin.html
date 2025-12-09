@@ -45,6 +45,8 @@
                         <th>Username</th>
                         <th>Email</th>
                         <th>Tier</th>
+                        <th>Test</th>
+                        <th>Verified</th>
                         <th>Generations</th>
                         <th>Integrations</th>
                         <th>Created</th>
@@ -69,6 +71,20 @@
                                 {% else %}🆓 Free
                                 {% endif %}
                             </span>
+                        </td>
+                        <td>
+                            {% if user.username.lower() == 'gregyampolsky' or user.email.lower() == 'gregyampolsky@gmail.com' %}
+                                <input type="checkbox" {% if user.test_flag %}checked{% endif %} disabled title="Protected account">
+                            {% else %}
+                                <input type="checkbox" {% if user.test_flag %}checked{% endif %} onchange="toggleTestFlag({{ user.id }}, this)" title="Toggle test account status">
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.email_verified %}
+                                <span style="color: #27ae60;">✓</span>
+                            {% else %}
+                                <span style="color: #e74c3c;">✗</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if user.subscription_tier == 'admin' %}
@@ -101,6 +117,10 @@
                                 <button onclick="showChangeTierModal({{ user.id }}, '{{ user.username }}', '{{ user.subscription_tier or 'free_tier' }}')" 
                                         class="btn-small btn-primary">
                                     Change Tier
+                                </button>
+                                <button onclick="showChangeEmailModal({{ user.id }}, '{{ user.username }}', '{{ user.email }}')" 
+                                        class="btn-small btn-secondary">
+                                    Change Email
                                 </button>
                                 <button onclick="showDeleteUserModal({{ user.id }}, '{{ user.username }}')" 
                                         class="btn-small btn-danger">
@@ -163,6 +183,33 @@
             <div class="modal-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeChangeTierModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Update Tier</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Change Email Modal -->
+<div id="changeEmailModal" class="modal">
+    <div class="modal-content">
+        <h2>Change User Email</h2>
+        <p>Change email for <strong id="emailModalUsername"></strong></p>
+        <p style="color: #666; font-size: 0.875rem; margin-top: 0.5rem;">Current email: <strong id="emailModalCurrentEmail"></strong></p>
+        <form method="POST" action="{{ url_for('admin.update_user_email') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" id="emailModalUserId" name="user_id"/>
+            
+            <div class="form-group">
+                <label for="new_email">New Email Address:</label>
+                <input type="email" id="new_email" name="new_email" required 
+                       placeholder="user@example.com" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"/>
+                <p style="color: #666; font-size: 0.875rem; margin-top: 0.5rem;">
+                    ℹ️ Admin changes do not require email verification
+                </p>
+            </div>
+            
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeChangeEmailModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Email</button>
             </div>
         </form>
     </div>
@@ -325,6 +372,7 @@
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
+        justify-content: center;
     }
     
     .btn-small {
@@ -334,6 +382,7 @@
         border-radius: 4px;
         cursor: pointer;
         transition: background-color 0.2s;
+        white-space: nowrap;
     }
     
     .btn-small.btn-primary {
@@ -343,6 +392,15 @@
     
     .btn-small.btn-primary:hover {
         background: #2980b9;
+    }
+    
+    .btn-small.btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-small.btn-secondary:hover {
+        background: #5a6268;
     }
     
     .btn-small.btn-danger {
@@ -539,6 +597,18 @@
         document.getElementById('changeTierModal').classList.remove('show');
     }
     
+    function showChangeEmailModal(userId, username, currentEmail) {
+        document.getElementById('emailModalUserId').value = userId;
+        document.getElementById('emailModalUsername').textContent = username;
+        document.getElementById('emailModalCurrentEmail').textContent = currentEmail;
+        document.getElementById('new_email').value = '';
+        document.getElementById('changeEmailModal').classList.add('show');
+    }
+    
+    function closeChangeEmailModal() {
+        document.getElementById('changeEmailModal').classList.remove('show');
+    }
+    
     function showDeleteUserModal(userId, username) {
         document.getElementById('deleteUserId').value = userId;
         document.getElementById('deleteUsername').textContent = username;
@@ -549,13 +619,58 @@
         document.getElementById('deleteUserModal').classList.remove('show');
     }
     
+    function toggleTestFlag(userId, checkbox) {
+        // Get CSRF token
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        
+        // Save the original checked state in case we need to revert
+        const originalState = !checkbox.checked;
+        
+        // Make AJAX call to toggle test flag
+        fetch('/admin/toggle_test_flag', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ user_id: userId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update checkbox to match server state
+                checkbox.checked = data.test_flag;
+                
+                // Show brief success message
+                const row = checkbox.closest('tr');
+                const originalColor = row.style.backgroundColor;
+                row.style.backgroundColor = '#d4edda';
+                setTimeout(() => {
+                    row.style.backgroundColor = originalColor;
+                }, 1000);
+            } else {
+                // Revert checkbox on error
+                checkbox.checked = originalState;
+                alert('Error: ' + (data.error || 'Failed to toggle test flag'));
+            }
+        })
+        .catch(error => {
+            // Revert checkbox on error
+            checkbox.checked = originalState;
+            alert('Error toggling test flag: ' + error);
+        });
+    }
+    
     // Close modals when clicking outside
     window.onclick = function(event) {
         const changeTierModal = document.getElementById('changeTierModal');
+        const changeEmailModal = document.getElementById('changeEmailModal');
         const deleteUserModal = document.getElementById('deleteUserModal');
         
         if (event.target === changeTierModal) {
             closeChangeTierModal();
+        } else if (event.target === changeEmailModal) {
+            closeChangeEmailModal();
         } else if (event.target === deleteUserModal) {
             closeDeleteUserModal();
         }

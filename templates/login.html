@@ -16,10 +16,17 @@
         <div class="form-group">
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
+            <div style="margin-top: 0.5rem; text-align: right;">
+                <a href="{{ url_for('auth.forgot_password') }}" style="color: #3498db; font-size: 0.9rem; text-decoration: none;">Forgot Password?</a>
+            </div>
         </div>
         
         <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
     </form>
+    
+    <p style="margin-top: 1rem; text-align: center; font-size: 0.9rem;">
+        Didn't receive verification email? <a href="{{ url_for('auth.resend_verification') }}" style="color: #3498db;">Resend</a>
+    </p>
     
     <div style="margin: 2rem 0; text-align: center; position: relative;">
         <div style="border-top: 1px solid #ddd; position: absolute; top: 50%; left: 0; right: 0;"></div>

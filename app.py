@@ -98,11 +98,29 @@ def create_app():
                 ADD COLUMN IF NOT EXISTS plan_generation_reset_date DATE;
             '''))
             
+            # Migration 3: Test flag, email verification, and password reset
+            db.session.execute(db.text('''
+                ALTER TABLE "user" 
+                ADD COLUMN IF NOT EXISTS test_flag BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS verification_token_expiry TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMP;
+            '''))
+            
             # Set admin tier for gregyampolsky accounts
             db.session.execute(db.text('''
                 UPDATE "user"
                 SET subscription_tier = 'admin'
                 WHERE (LOWER(email) = 'gregyampolsky@gmail.com' OR LOWER(username) = 'gregyampolsky');
+            '''))
+            
+            # Mark existing users as email verified (grandfather clause)
+            db.session.execute(db.text('''
+                UPDATE "user"
+                SET email_verified = TRUE
+                WHERE email_verified = FALSE AND created_at < NOW();
             '''))
             
             db.session.commit()
