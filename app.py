@@ -32,6 +32,7 @@ from routes.auth import auth_bp
 from routes.activities import activities_bp
 from routes.planning import planning_bp
 from routes.integrations import integrations_bp
+from routes.admin import admin_bp
 
 
 def create_app():
@@ -67,6 +68,7 @@ def create_app():
     app.register_blueprint(activities_bp)
     app.register_blueprint(planning_bp)
     app.register_blueprint(integrations_bp)
+    app.register_blueprint(admin_bp)
     
     # Exempt CSRF for AJAX endpoints (they use same-origin policy)
     csrf.exempt(planning_bp)

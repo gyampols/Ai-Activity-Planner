@@ -483,6 +483,14 @@ def _generate_mock_plan(activities, now, weather_forecast):
 @login_required
 def export_to_google_calendar():
     """Export the generated plan to Google Calendar."""
+    # Check subscription tier - only paid_tier and admin can export to calendar
+    user_tier = current_user.subscription_tier or 'free_tier'
+    if user_tier not in ['paid_tier', 'admin']:
+        return jsonify({
+            'error': 'Calendar export is only available for Paid and Admin tiers. Please upgrade your subscription to access this feature.',
+            'upgrade_required': True
+        }), 403
+    
     if not current_user.google_token:
         return jsonify({'error': 'Google account not connected. Please connect your Google account first.'}), 403
     

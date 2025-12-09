@@ -390,6 +390,17 @@ def import_calendar_events():
     from flask_wtf.csrf import CSRFProtect
     
     print(f"[Calendar Import] Request from user {current_user.id}")
+    
+    # Check subscription tier - only paid_tier and admin can import from calendar
+    user_tier = current_user.subscription_tier or 'free_tier'
+    if user_tier not in ['paid_tier', 'admin']:
+        print(f"[Calendar Import] ERROR: User tier {user_tier} not authorized")
+        return jsonify({
+            'success': False,
+            'error': 'Calendar import is only available for Paid and Admin tiers. Please upgrade your subscription to access this feature.',
+            'upgrade_required': True
+        }), 403
+    
     print(f"[Calendar Import] Has google_token: {bool(current_user.google_token)}")
     print(f"[Calendar Import] Has google_id: {bool(current_user.google_id)}")
     

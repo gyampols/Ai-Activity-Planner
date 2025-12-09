@@ -389,13 +389,19 @@
         <div id="calendar-container" style="display: none; margin-top: 2rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2 style="margin: 0;">Your Weekly Activity Calendar</h2>
-                {% if current_user.google_id %}
-                <button id="export-calendar-btn" class="btn btn-success" style="display: none;">
-                    📅 Export to Google Calendar
-                </button>
+                {% if (current_user.subscription_tier == 'paid_tier' or current_user.subscription_tier == 'admin') %}
+                    {% if current_user.google_id %}
+                    <button id="export-calendar-btn" class="btn btn-success" style="display: none;">
+                        📅 Export to Google Calendar
+                    </button>
+                    {% else %}
+                    <p style="margin: 0; color: #666; font-size: 0.9rem;">
+                        <a href="{{ url_for('integrations.connect_google') }}" style="color: #3498db;">Connect Google Account</a> to export to calendar
+                    </p>
+                    {% endif %}
                 {% else %}
                 <p style="margin: 0; color: #666; font-size: 0.9rem;">
-                    <a href="{{ url_for('integrations.connect_google') }}" style="color: #3498db;">Connect Google Account</a> to export to calendar
+                    📅 Calendar export available with <a href="{{ url_for('main.settings') }}#subscription" style="color: #3498db;">Paid Plan</a>
                 </p>
                 {% endif %}
             </div>

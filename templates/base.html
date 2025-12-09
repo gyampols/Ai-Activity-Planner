@@ -257,6 +257,9 @@
                 {% if current_user.is_authenticated %}
                     <li><a href="{{ url_for('activities.log') }}">Log</a></li>
                     <li><a href="{{ url_for('planning.plan') }}">Plan</a></li>
+                    {% if current_user.subscription_tier == 'admin' %}
+                        <li><a href="{{ url_for('admin.admin_panel') }}" style="background: linear-gradient(90deg, #9333ea 0%, #7c3aed 100%); padding: 0.5rem 1rem; border-radius: 4px;">👑 Admin</a></li>
+                    {% endif %}
                 {% endif %}
             </div>
             <div>

@@ -250,7 +250,7 @@
 <div class="card">
     <h2>Add Appointment/Responsibility</h2>
     
-    {% if current_user.google_id %}
+    {% if (current_user.subscription_tier == 'paid_tier' or current_user.subscription_tier == 'admin') and current_user.google_id %}
     <div style="background: #e3f2fd; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; border-left: 4px solid #2196f3;">
         <p style="margin-bottom: 0.5rem; font-weight: 600; color: #1976d2;">Quick Import Option</p>
         <p style="margin-bottom: 0.75rem; font-size: 0.9rem; color: #555;">
@@ -264,6 +264,13 @@
             Import from Google Calendar
         </button>
         <div id="import_status" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+    </div>
+    {% elif current_user.subscription_tier == 'free_tier' %}
+    <div style="background: #fff3cd; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; font-size: 0.9rem; color: #856404;">
+            📅 <strong>Upgrade to Paid Plan</strong> to import appointments from Google Calendar. 
+            <a href="{{ url_for('main.settings') }}#subscription" style="color: #856404; text-decoration: underline;">View Plans</a>
+        </p>
     </div>
     {% endif %}
     

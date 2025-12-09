@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - AI Activity Planner{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>👑 Admin Panel</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Stats Overview -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card free">
+            <div class="stat-number">{{ stats.free }}</div>
+            <div class="stat-label">Free Tier</div>
+        </div>
+        <div class="stat-card paid">
+            <div class="stat-number">{{ stats.paid }}</div>
+            <div class="stat-label">Paid Tier</div>
+        </div>
+        <div class="stat-card admin">
+            <div class="stat-number">{{ stats.admin }}</div>
+            <div class="stat-label">Admin</div>
+        </div>
+    </div>
+    
+    <!-- User Management Table -->
+    <div class="users-section">
+        <h2>User Management</h2>
+        <div class="table-container">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Tier</th>
+                        <th>Generations</th>
+                        <th>Integrations</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr {% if user.id == current_user.id %}class="current-user"{% endif %}>
+                        <td>{{ user.id }}</td>
+                        <td>
+                            {{ user.username }}
+                            {% if user.id == current_user.id %}
+                                <span class="badge-you">You</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            <span class="tier-badge {{ user.subscription_tier or 'free_tier' }}">
+                                {% if user.subscription_tier == 'admin' %}👑 Admin
+                                {% elif user.subscription_tier == 'paid_tier' %}⭐ Paid
+                                {% else %}🆓 Free
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.subscription_tier == 'admin' %}
+                                ♾️ Unlimited
+                            {% else %}
+                                {{ user.plan_generations_count or 0 }} / 
+                                {{ 20 if user.subscription_tier == 'paid_tier' else 3 }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="integration-icons">
+                                {% if user.google_id %}
+                                    <span title="Google Connected">🔗G</span>
+                                {% endif %}
+                                {% if user.fitbit_connected %}
+                                    <span title="Fitbit Connected">🔗F</span>
+                                {% endif %}
+                                {% if user.oura_connected %}
+                                    <span title="Oura Connected">🔗O</span>
+                                {% endif %}
+                                {% if not user.google_id and not user.fitbit_connected and not user.oura_connected %}
+                                    <span style="color: #999;">—</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                        <td>
+                            {% if user.id != current_user.id %}
+                            <div class="action-buttons">
+                                <button onclick="showChangeTierModal({{ user.id }}, '{{ user.username }}', '{{ user.subscription_tier or 'free_tier' }}')" 
+                                        class="btn-small btn-primary">
+                                    Change Tier
+                                </button>
+                                <button onclick="showDeleteUserModal({{ user.id }}, '{{ user.username }}')" 
+                                        class="btn-small btn-danger">
+                                    Delete
+                                </button>
+                            </div>
+                            {% else %}
+                            <span style="color: #999; font-size: 0.875rem;">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Change Tier Modal -->
+<div id="changeTierModal" class="modal">
+    <div class="modal-content">
+        <h2>Change User Subscription Tier</h2>
+        <p>Change subscription tier for <strong id="modalUsername"></strong></p>
+        <form method="POST" action="{{ url_for('admin.update_user_tier') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" id="modalUserId" name="user_id"/>
+            
+            <div class="form-group">
+                <label>Select New Tier:</label>
+                <div class="tier-options">
+                    <label class="tier-option">
+                        <input type="radio" name="new_tier" value="free_tier" required/>
+                        <span class="tier-card free_tier">
+                            <span class="tier-icon">🆓</span>
+                            <span class="tier-name">Free Tier</span>
+                            <span class="tier-desc">3 generations/week</span>
+                        </span>
+                    </label>
+                    <label class="tier-option">
+                        <input type="radio" name="new_tier" value="paid_tier" required/>
+                        <span class="tier-card paid_tier">
+                            <span class="tier-icon">⭐</span>
+                            <span class="tier-name">Paid Tier</span>
+                            <span class="tier-desc">20 generations/week</span>
+                        </span>
+                    </label>
+                    <label class="tier-option">
+                        <input type="radio" name="new_tier" value="admin" required/>
+                        <span class="tier-card admin">
+                            <span class="tier-icon">👑</span>
+                            <span class="tier-name">Admin</span>
+                            <span class="tier-desc">Unlimited access</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeChangeTierModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Tier</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete User Modal -->
+<div id="deleteUserModal" class="modal">
+    <div class="modal-content">
+        <h2>Delete User</h2>
+        <p>Are you sure you want to delete <strong id="deleteUsername"></strong>?</p>
+        <p style="color: #c53030;">This will permanently delete:</p>
+        <ul>
+            <li>User account and profile</li>
+            <li>All activities and appointments</li>
+            <li>All connected integrations</li>
+        </ul>
+        <p><strong>This action cannot be undone.</strong></p>
+        <form method="POST" action="{{ url_for('admin.delete_user') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" id="deleteUserId" name="user_id"/>
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">Yes, Delete User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card.free {
+        background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    }
+    
+    .stat-card.paid {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    }
+    
+    .stat-card.admin {
+        background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .users-section {
+        margin-top: 2rem;
+    }
+    
+    .users-section h2 {
+        margin-bottom: 1rem;
+        color: #2c3e50;
+    }
+    
+    .table-container {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+    
+    .users-table thead {
+        background: #f8f9fa;
+    }
+    
+    .users-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #2c3e50;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .users-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .users-table tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .users-table tr.current-user {
+        background: #e3f2fd;
+    }
+    
+    .users-table tr.current-user:hover {
+        background: #bbdefb;
+    }
+    
+    .tier-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .tier-badge.free_tier {
+        background: #e9ecef;
+        color: #495057;
+    }
+    
+    .tier-badge.paid_tier {
+        background: #ffc107;
+        color: #000;
+    }
+    
+    .tier-badge.admin {
+        background: #9c27b0;
+        color: white;
+    }
+    
+    .badge-you {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: #2196f3;
+        color: white;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+        font-weight: 600;
+    }
+    
+    .integration-icons {
+        display: flex;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-small {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .btn-small.btn-primary {
+        background: #3498db;
+        color: white;
+    }
+    
+    .btn-small.btn-primary:hover {
+        background: #2980b9;
+    }
+    
+    .btn-small.btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-small.btn-danger:hover {
+        background: #c82333;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal.show {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-content h2 {
+        margin-top: 0;
+        color: #2c3e50;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+    
+    .tier-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .tier-option {
+        cursor: pointer;
+    }
+    
+    .tier-option input[type="radio"] {
+        display: none;
+    }
+    
+    .tier-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.5rem;
+        border: 2px solid #ddd;
+        border-radius: 12px;
+        transition: all 0.2s;
+        text-align: center;
+    }
+    
+    .tier-option input[type="radio"]:checked + .tier-card {
+        border-color: #3498db;
+        background: #e3f2fd;
+    }
+    
+    .tier-card:hover {
+        border-color: #3498db;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .tier-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .tier-name {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.25rem;
+    }
+    
+    .tier-desc {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+    
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .alert-success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .btn-primary {
+        background-color: #3498db;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background-color: #2980b9;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+    
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .table-container {
+            font-size: 0.875rem;
+        }
+        
+        .users-table th,
+        .users-table td {
+            padding: 0.5rem;
+        }
+        
+        .tier-options {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<script>
+    function showChangeTierModal(userId, username, currentTier) {
+        document.getElementById('modalUserId').value = userId;
+        document.getElementById('modalUsername').textContent = username;
+        
+        // Pre-select current tier
+        const radioButtons = document.querySelectorAll('input[name="new_tier"]');
+        radioButtons.forEach(radio => {
+            if (radio.value === currentTier) {
+                radio.checked = true;
+            }
+        });
+        
+        document.getElementById('changeTierModal').classList.add('show');
+    }
+    
+    function closeChangeTierModal() {
+        document.getElementById('changeTierModal').classList.remove('show');
+    }
+    
+    function showDeleteUserModal(userId, username) {
+        document.getElementById('deleteUserId').value = userId;
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteUserModal').classList.add('show');
+    }
+    
+    function closeDeleteUserModal() {
+        document.getElementById('deleteUserModal').classList.remove('show');
+    }
+    
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+        const changeTierModal = document.getElementById('changeTierModal');
+        const deleteUserModal = document.getElementById('deleteUserModal');
+        
+        if (event.target === changeTierModal) {
+            closeChangeTierModal();
+        } else if (event.target === deleteUserModal) {
+            closeDeleteUserModal();
+        }
+    }
+</script>
+{% endblock %}
