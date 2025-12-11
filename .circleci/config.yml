@@ -1,0 +1,119 @@
+version: 2.1
+
+# Define orbs for common tasks
+orbs:
+  gcp-cli: circleci/gcp-cli@3.1.0
+  python: circleci/python@2.1.1
+
+# Define reusable commands
+commands:
+  install_dependencies:
+    description: "Install Python dependencies"
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          pip-dependency-file: requirements.txt
+
+# Define jobs
+jobs:
+  test:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - deps-{{ checksum "requirements.txt" }}
+            - deps-
+      - run:
+          name: Install dependencies
+          command: |
+            python -m venv venv
+            . venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+      - save_cache:
+          key: deps-{{ checksum "requirements.txt" }}
+          paths:
+            - venv
+      - run:
+          name: Run tests
+          command: |
+            . venv/bin/activate
+            # Add test command here when tests are available
+            echo "Tests placeholder - add pytest or unittest commands"
+            
+  build:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t ai-activity-planner:${CIRCLE_SHA1} .
+            docker tag ai-activity-planner:${CIRCLE_SHA1} ai-activity-planner:latest
+      - run:
+          name: Save Docker image
+          command: |
+            docker save ai-activity-planner:${CIRCLE_SHA1} -o image.tar
+      - persist_to_workspace:
+          root: .
+          paths:
+            - image.tar
+
+  deploy:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - gcp-cli/install
+      - gcp-cli/initialize
+      - run:
+          name: Set Google Cloud Project
+          command: |
+            gcloud config set project ai-activity-planner-cloud
+      - run:
+          name: Deploy to Cloud Run
+          command: |
+            gcloud run deploy ai-activity-planner \
+              --source . \
+              --region us-central1 \
+              --allow-unauthenticated \
+              --set-env-vars "DATABASE_URL=${DATABASE_URL},SENDGRID_API_KEY=${SENDGRID_API_KEY},EMAIL_FROM=${EMAIL_FROM},GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET},OPENAI_API_KEY=${OPENAI_API_KEY},FITBIT_CLIENT_ID=${FITBIT_CLIENT_ID},FITBIT_CLIENT_SECRET=${FITBIT_CLIENT_SECRET},BASE_URL=${BASE_URL},OAUTHLIB_INSECURE_TRANSPORT=0" \
+              --add-cloudsql-instances ai-activity-planner-cloud:us-central1:ai-planner-db \
+              --project ai-activity-planner-cloud
+      - run:
+          name: Deployment Complete
+          command: |
+            echo "Deployment successful!"
+            gcloud run services describe ai-activity-planner --region us-central1 --format="value(status.url)"
+
+# Define workflows
+workflows:
+  version: 2
+  build-test-deploy:
+    jobs:
+      - test:
+          filters:
+            branches:
+              only: /.*/
+      - build:
+          requires:
+            - test
+          filters:
+            branches:
+              only: /.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - main
+                - production
+          context:
+            - gcp-deployment

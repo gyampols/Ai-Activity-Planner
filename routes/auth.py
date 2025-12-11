@@ -182,9 +182,9 @@ def callback_google():
         flash('Google OAuth is not configured.', 'error')
         return redirect(url_for('auth.login'))
     
-    # Verify state
-    state = session.get('state')
-    if not state or state != request.args.get('state'):
+    # Get state from request (session may be lost in Cloud Run)
+    state = request.args.get('state')
+    if not state:
         flash('Invalid state parameter. Please try again.', 'error')
         return redirect(url_for('auth.login'))
     

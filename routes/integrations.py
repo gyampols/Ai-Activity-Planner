@@ -503,14 +503,25 @@ def import_calendar_events():
                 event_time = None
                 duration = None
             
-            # Check for duplicate
-            existing = Appointment.query.filter_by(
-                user_id=current_user.id,
-                title=title,
-                date=event_date
-            ).first()
+            # Check for duplicate - compare title, date, and time to avoid duplicates
+            if event_time:
+                # For timed events, check exact match with time
+                existing = Appointment.query.filter_by(
+                    user_id=current_user.id,
+                    title=title,
+                    date=event_date,
+                    time=event_time
+                ).first()
+            else:
+                # For all-day events, check title and date only
+                existing = Appointment.query.filter_by(
+                    user_id=current_user.id,
+                    title=title,
+                    date=event_date
+                ).filter(Appointment.time.is_(None)).first()
             
             if existing:
+                print(f"[Calendar Import] Skipping duplicate: {title} on {event_date}")
                 continue  # Skip duplicates
             
             # Determine appointment type from title/description

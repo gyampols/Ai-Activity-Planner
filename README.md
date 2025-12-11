@@ -9,9 +9,11 @@ A professional-grade Flask web application that generates personalized weekly ac
 - **AI-Powered Planning**: GPT-4 integration for intelligent weekly activity scheduling
 - **Weather Integration**: Real-time 7-day forecasts with sunrise/sunset times
 - **Fitness Tracking**: Fitbit and Oura integration with manual score input option
-- **Google Calendar Export**: One-click export of your weekly plan
+- **Google Calendar Sync**: One-click export and import from Google Calendar (no duplicates)
 - **User Authentication**: Secure login with Google OAuth support
+- **Persistent Form Data**: Cookie-based storage for additional info and last activity
 - **Responsive Design**: Optimized for desktop and mobile devices
+- **CI/CD Pipeline**: Automated testing and deployment with CircleCI
 
 ## Tech Stack
 
@@ -71,6 +73,27 @@ python app.py
 
 ### Deployment
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Cloud Run deployment instructions.
+
+See [.circleci/README.md](.circleci/README.md) for CircleCI CI/CD setup instructions.
+
+## Recent Updates
+
+### Calendar Import Enhancement
+- Google Calendar import now checks for duplicate events before importing
+- Compares title, date, and time to prevent duplicate appointments
+- Skips all-day events that already exist
+
+### Cookie-Based Form Persistence
+- "Last Activity Completed" field is automatically saved to cookies
+- "Additional Information" field is automatically saved to cookies
+- Values persist across sessions until cookies are cleared
+- 30-day cookie expiration
+
+### CI/CD Pipeline
+- Automated testing on every push
+- Automatic deployment to Cloud Run on main branch
+- Docker image building and caching
+- Environment variable management through CircleCI
 
 ## How to Use the App
 
