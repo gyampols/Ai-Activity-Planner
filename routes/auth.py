@@ -1,25 +1,36 @@
 """
-Authentication routes including login, signup, and OAuth flows.
+Authentication routes for login, signup, logout, and OAuth flows.
 """
 import json
 from datetime import datetime
+from typing import Optional
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
-from google_auth_oauthlib.flow import Flow
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
+from google_auth_oauthlib.flow import Flow
 from urllib.parse import urlparse, urljoin
 
-from models import db, User
 from config import config
-from utils.email import send_verification_email, send_password_reset_email, resend_verification_email
-
+from models import db, User
+from utils.email import (
+    send_verification_email,
+    send_password_reset_email,
+    resend_verification_email,
+)
+from utils.status_logger import (
+    log_account_created,
+    log_email_verified,
+    log_google_connected,
+    log_password_changed,
+)
 
 auth_bp = Blueprint('auth', __name__)
 
 
-def is_safe_url(target):
-    """Check if a URL is safe to redirect to (prevents open redirects)."""
+def is_safe_url(target: str) -> bool:
+    """Validate URL is safe for redirection to prevent open redirect attacks."""
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
@@ -50,7 +61,7 @@ def login():
                 flash('Please verify your email before logging in. Check your inbox for the verification link.', 'warning')
                 return render_template('login.html')
             
-            login_user(user)
+            login_user(user, remember=True)  # Remember user for 30 days
             flash('Logged in successfully!', 'success')
             next_page = request.args.get('next')
             if next_page and is_safe_url(next_page):
@@ -120,6 +131,9 @@ def signup():
         
         db.session.add(user)
         db.session.commit()
+        
+        # Log account creation
+        log_account_created(user.id, source='user_action')
         
         # Send verification email for non-admin users
         if not user.email_verified:
@@ -268,6 +282,11 @@ def callback_google():
                     user.subscription_tier = 'free_tier'
                 
                 db.session.add(user)
+                db.session.commit()
+                
+                # Log account creation via Google OAuth
+                log_account_created(user.id, source='user_action')
+                log_google_connected(user.id, source='user_action')
         else:
             # Update tokens
             user.google_token = credentials_json
@@ -275,7 +294,7 @@ def callback_google():
                 user.google_refresh_token = credentials.refresh_token
         
         db.session.commit()
-        login_user(user)
+        login_user(user, remember=True)  # Remember user for 30 days
         flash('Successfully logged in with Google!', 'success')
         return redirect(url_for('main.index'))
         
@@ -311,6 +330,9 @@ def verify_email():
     user.verification_token = None
     user.verification_token_expiry = None
     db.session.commit()
+    
+    # Log email verification
+    log_email_verified(user.id, source='user_action')
     
     flash('Email verified successfully! You can now log in.', 'success')
     return redirect(url_for('auth.login'))
@@ -409,6 +431,9 @@ def reset_password():
         user.reset_token = None
         user.reset_token_expiry = None
         db.session.commit()
+        
+        # Log password change
+        log_password_changed(user.id, source='user_action')
         
         flash('Password reset successfully! You can now log in.', 'success')
         return redirect(url_for('auth.login'))

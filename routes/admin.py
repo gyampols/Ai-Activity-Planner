@@ -1,24 +1,31 @@
 """
-Admin routes for user management.
+Admin routes for user management and system administration.
 """
 from functools import wraps
+from typing import Callable
+
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import db, User
-from datetime import datetime
 
+from models import db, User
+from utils.status_logger import (
+    log_subscription_changed,
+    log_test_flag_changed,
+    log_email_changed,
+    log_account_deleted,
+)
 
 admin_bp = Blueprint('admin', __name__)
 
 
-def admin_required(f):
-    """Decorator to require admin access."""
-    @wraps(f)
+def admin_required(func: Callable) -> Callable:
+    """Decorator requiring admin subscription tier for access."""
+    @wraps(func)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or current_user.subscription_tier != 'admin':
             flash('You do not have permission to access this page.', 'danger')
             return redirect(url_for('main.index'))
-        return f(*args, **kwargs)
+        return func(*args, **kwargs)
     return decorated_function
 
 
@@ -83,10 +90,17 @@ def update_user_tier():
         old_tier = user.subscription_tier or 'free_tier'
         user.subscription_tier = new_tier
         
+        # If upgrading to paid_tier, mark as has_paid_before
+        if new_tier == 'paid_tier':
+            user.has_paid_before = True
+        
         # Reset generation count when changing tiers
         user.plan_generations_count = 0
         
         db.session.commit()
+        
+        # Log the status change
+        log_subscription_changed(user.id, old_tier, new_tier, source='admin_action', changed_by_user_id=current_user.id)
         
         flash(f'Successfully changed {user.username}\'s subscription from {old_tier} to {new_tier}.', 'success')
         return redirect(url_for('admin.admin_panel'))
@@ -125,6 +139,11 @@ def delete_user():
             return redirect(url_for('admin.admin_panel'))
         
         username = user.username
+        user_id = user.id
+        
+        # Log the deletion before removing the user
+        log_account_deleted(user_id, source='admin_action', changed_by_user_id=current_user.id)
+        
         db.session.delete(user)
         db.session.commit()
         
@@ -162,8 +181,12 @@ def toggle_test_flag():
             return jsonify({'success': False, 'error': 'Cannot modify gregyampolsky account'}), 403
         
         # Toggle test flag
+        old_value = user.test_flag
         user.test_flag = not user.test_flag
         db.session.commit()
+        
+        # Log the test flag change
+        log_test_flag_changed(user.id, old_value, user.test_flag, source='admin_action', changed_by_user_id=current_user.id)
         
         return jsonify({'success': True, 'test_flag': user.test_flag})
     
@@ -210,6 +233,9 @@ def update_user_email():
         user.email = new_email
         user.email_verified = True  # Admin changes don't require verification
         db.session.commit()
+        
+        # Log the email change
+        log_email_changed(user.id, old_email, new_email, source='admin_action', changed_by_user_id=current_user.id)
         
         flash(f'Successfully changed {user.username}\'s email from {old_email} to {new_email}.', 'success')
         return redirect(url_for('admin.admin_panel'))

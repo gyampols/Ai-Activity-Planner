@@ -1,25 +1,21 @@
 """
-AI-powered activity planning routes.
+AI-powered activity planning routes using OpenAI GPT.
 """
 import json
 import re
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
 from openai import OpenAI
 
+from config import config
 from models import db, Activity, Appointment
 from utils.helpers import get_weather_forecast
-from config import config
-
 
 planning_bp = Blueprint('planning', __name__)
 
-
-# Initialize OpenAI client
-openai_client = None
-if config.OPENAI_API_KEY:
-    openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
+openai_client = OpenAI(api_key=config.OPENAI_API_KEY) if config.OPENAI_API_KEY else None
 
 
 @planning_bp.route('/plan', methods=['GET', 'POST'])
@@ -50,7 +46,32 @@ def plan():
         if weather_data:
             weather_forecast = weather_data.get('forecast')
     
-    return render_template('plan.html', activities=activities, weather_forecast=weather_forecast)
+    # Load persisted schedule if available
+    last_schedule = None
+    last_schedule_date = None
+    if current_user.last_generated_schedule:
+        try:
+            last_schedule = json.loads(current_user.last_generated_schedule)
+            last_schedule_date = current_user.last_schedule_date.isoformat() if current_user.last_schedule_date else None
+        except (json.JSONDecodeError, TypeError):
+            last_schedule = None
+    
+    return render_template('plan.html', 
+                           activities=activities, 
+                           weather_forecast=weather_forecast,
+                           last_schedule=last_schedule,
+                           last_schedule_date=last_schedule_date)
+
+
+@planning_bp.route('/debug/weather')
+@login_required
+def debug_weather():
+    """Return raw weather inputs used by the planner to help align with phone apps."""
+    if not current_user.location:
+        return jsonify({'error': 'No location set'}), 400
+    temp_unit = current_user.temperature_unit or 'C'
+    data = get_weather_forecast(current_user.location, temp_unit)
+    return jsonify(data or {'error': 'weather fetch failed'})
 
 
 @planning_bp.route('/update_manual_scores', methods=['POST'])
@@ -113,7 +134,7 @@ def generate_plan():
     # Check tier-based limits
     tier_limits = {
         'free_tier': 3,
-        'paid_tier': 20,
+        'paid_tier': float('inf'),  # Unlimited for paid users
         'admin': float('inf')  # Unlimited
     }
     
@@ -123,11 +144,11 @@ def generate_plan():
     if current_user.plan_generations_count >= limit:
         days_until_reset = (current_user.plan_generation_reset_date - today).days
         return jsonify({
-            'error': f'You have reached your weekly limit of {limit} plan generations. Your limit resets in {days_until_reset} day(s). Consider upgrading to paid tier for more generations!',
+            'error': f'You have reached your weekly limit of {int(limit)} plan generations. Your limit resets in {days_until_reset} day(s). Consider upgrading to paid tier for unlimited generations!',
             'limit_reached': True,
             'current_tier': user_tier,
             'generations_used': current_user.plan_generations_count,
-            'limit': limit,
+            'limit': int(limit) if limit != float('inf') else 'unlimited',
             'reset_date': current_user.plan_generation_reset_date.isoformat()
         }), 429
     
@@ -141,10 +162,20 @@ def generate_plan():
         request_data = request.get_json() or {}
         extra_info = request_data.get('extra_info', '').strip()
         last_activity = request_data.get('last_activity', '').strip()
+        injuries_pains = request_data.get('injuries_pains', '').strip()
         allow_multiple = request_data.get('allow_multiple_activities', False)
-    except:
+        excluded_activity_ids = request_data.get('excluded_activity_ids', [])
+    except (TypeError, AttributeError, KeyError):
         extra_info = ''
+        injuries_pains = ''
         allow_multiple = False
+        excluded_activity_ids = []
+    
+    # Filter out excluded activities
+    if excluded_activity_ids:
+        activities = [a for a in activities if a.id not in excluded_activity_ids]
+        if not activities:
+            return jsonify({'error': 'Please include at least one activity in your plan!'}), 400
     
     # Get weather forecast and timezone
     weather_forecast = None
@@ -162,7 +193,7 @@ def generate_plan():
             import pytz
             tz = pytz.timezone(location_timezone)
             now = datetime.now(tz)
-        except:
+        except (ImportError, pytz.exceptions.UnknownTimeZoneError):
             now = datetime.now()
     else:
         now = datetime.now()
@@ -190,7 +221,7 @@ def generate_plan():
     # Build prompt
     prompt = _build_planning_prompt(
         activities, now, current_date, current_time, 
-        weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple
+        weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple, injuries_pains
     )
     
     try:
@@ -199,6 +230,7 @@ def generate_plan():
             return jsonify(_generate_mock_plan(activities, now, weather_forecast))
         
         # Make OpenAI API call with optimized parameters
+        # Use gpt-4o for reliable JSON generation
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -222,16 +254,22 @@ DECISION PRINCIPLES:
 - Safety first (weather conditions, recovery needs, daylight requirements)
 - Respect user preferences (time/day preferences, activity types)
 - Balance variety with consistency
-- Optimize for long-term adherence and enjoyment"""
+- Optimize for long-term adherence and enjoyment
+- consider the users preferences and constraints when generating the plan"""
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=2000,
-            temperature=0.7,
+            max_tokens=3000,
+            temperature=0.4,
             response_format={"type": "json_object"}
         )
         
         plan_text = response.choices[0].message.content
+        
+        # Handle empty response
+        if not plan_text or not plan_text.strip():
+            print("OpenAI returned empty content")
+            return jsonify({'error': 'AI returned empty response. Please try again.'}), 500
         
         # Try to parse as JSON
         try:
@@ -244,6 +282,10 @@ DECISION PRINCIPLES:
             
             # Increment generation counter on successful plan creation
             current_user.plan_generations_count += 1
+            
+            # Save the generated schedule for persistence
+            current_user.last_generated_schedule = json.dumps(plan_json)
+            current_user.last_schedule_date = datetime.now()
             db.session.commit()
             
             return jsonify({'plan': plan_json, 'structured': True})
@@ -253,6 +295,10 @@ DECISION PRINCIPLES:
             # If not JSON, return as text
             # Still increment counter as plan was generated
             current_user.plan_generations_count += 1
+            
+            # Save the text-based schedule for persistence
+            current_user.last_generated_schedule = json.dumps({'text': plan_text})
+            current_user.last_schedule_date = datetime.now()
             db.session.commit()
             
             return jsonify({'plan': plan_text, 'structured': False})
@@ -262,7 +308,7 @@ DECISION PRINCIPLES:
 
 
 def _build_planning_prompt(activities, now, current_date, current_time, 
-                           weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple=False):
+                           weather_forecast, readiness_score, sleep_score, extra_info, last_activity, allow_multiple=False, injuries_pains=''):
     """Build the comprehensive prompt for OpenAI."""
     # Prepare activity information
     activity_info = []
@@ -311,7 +357,7 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
     
     # Add appointments
     if appointments:
-        prompt += f"\nScheduled Appointments & Responsibilities:\n"
+        prompt += "\nScheduled Appointments & Responsibilities:\n"
         for apt in appointments:
             apt_date = apt.date.strftime('%A, %b %d (%Y-%m-%d)')
             apt_info = f"- {apt.title} ({apt.appointment_type}) on {apt_date}"
@@ -329,18 +375,74 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
         prompt += f"\nLast Activity Completed:\n{last_activity}\n"
         prompt += "Consider this when planning to ensure proper recovery and variety.\n"
     
+    # Add injuries/pains information
+    if injuries_pains:
+        prompt += f"\n⚠️ CURRENT INJURIES OR PAINS:\n{injuries_pains}\n"
+        prompt += "CRITICAL: Avoid activities that could aggravate these conditions. Suggest modifications, lower intensity alternatives, or rest when appropriate. Prioritize recovery and safety.\n"
+    
     # Add extra information
     if extra_info:
         prompt += f"\nAdditional Context:\n{extra_info}\n"
     
-    # Add weather information
+    # Add weather information and surface condition guidance
     if weather_forecast:
         temp_unit_display = current_user.temperature_unit or 'C'
         prompt += f"\nWeather forecast for {current_user.location} (with daylight hours):\n"
         for day in weather_forecast:
-            prompt += f"- {day['date_short']}: {day['temp_max']}°{temp_unit_display}, Precipitation: {day['precipitation']}%, "
-            prompt += f"Sunrise: {day['sunrise']}, Sunset: {day['sunset']}\n"
+            # Include ground condition hints for planning
+            wet = day.get('is_wet_ground')
+            snowy = day.get('is_snowy_ground')
+            windy = day.get('is_windy')
+            wind_speed = day.get('wind_speed', 0)
+            wind_gusts = day.get('wind_gusts', 0)
+            cloud_cover = day.get('cloud_cover', 0) or 0
+            weathercode = day.get('weathercode', 0) or 0
+            
+            # Determine precipitation type from weathercode
+            precip_type = 'none'
+            if weathercode in [95]:
+                precip_type = 'thunderstorm'
+            elif weathercode in [96, 99]:
+                precip_type = 'thunderstorm with hail'
+            elif weathercode in [71, 73, 75, 77, 85, 86]:
+                precip_type = 'snow'
+            elif weathercode in [56, 57, 66, 67]:
+                precip_type = 'freezing rain'
+            elif weathercode in [51, 53, 55, 61, 63, 65, 80, 81, 82]:
+                precip_type = 'rain'
+            
+            short_term = ''
+            if day.get('is_today'):
+                nprecip = day.get('next3_precip_mm')
+                nrain = day.get('next3_rain_mm')
+                nsnow = day.get('next3_snow_mm')
+                if nprecip is not None:
+                    short_term = f" | next 3h: precip {nprecip}mm, rain {nrain or 0}mm, snow {nsnow or 0}mm"
+            # Build surface/condition notes
+            conditions = []
+            if wet:
+                conditions.append('wet')
+            if snowy:
+                conditions.append('snowy')
+            if windy:
+                conditions.append(f'windy (gusts {wind_gusts}mph)')
+            if precip_type == 'thunderstorm' or precip_type == 'thunderstorm with hail':
+                conditions.append(precip_type)
+            surface_note = f" (Conditions: {', '.join(conditions)})" if conditions else ''
+            
+            # Include precipitation type in forecast line
+            precip_info = f"Precipitation: {day['precipitation']}%"
+            if precip_type != 'none':
+                precip_info += f" ({precip_type})"
+            
+            prompt += f"- {day['date_short']}: {day['temp_max']}°{temp_unit_display}, {precip_info}, Cloud: {cloud_cover}%, Wind: {wind_speed}mph{short_term}, "
+            prompt += f"Sunrise: {day['sunrise']}, Sunset: {day['sunset']}{surface_note}\n"
         prompt += "\nIMPORTANT: Consider sunrise/sunset times for outdoor activities that require daylight. Schedule outdoor activities during daylight hours only.\n"
+        prompt += "If ground is wet or snowy, or if near-term rain/snow is expected (next 3h > 0mm), mark outdoor skateboarding/board sports as unsuitable and propose indoor alternatives (e.g., strength, mobility, stationary cardio).\n"
+        prompt += "SNOW GUIDANCE: During snow conditions, avoid outdoor cycling, running, and activities requiring dry ground. Suggest indoor workouts or winter-specific activities like indoor training.\n"
+        prompt += "THUNDERSTORM GUIDANCE: If thunderstorms are forecast, absolutely avoid ALL outdoor activities during that time. Prioritize safety and schedule indoor alternatives only.\n"
+        prompt += "WIND GUIDANCE: If wind >= 15mph or gusts >= 25mph, avoid cycling, running on exposed routes, and outdoor activities affected by wind. Suggest indoor alternatives or sheltered locations.\n"
+        prompt += "CLOUD GUIDANCE: High cloud cover (>80%) may reduce visibility and sunlight for outdoor activities like photography. Clear skies (<20%) are ideal for stargazing and outdoor photography.\n"
     
     # Add readiness and sleep scores
     if readiness_score or sleep_score:
@@ -397,6 +499,7 @@ CRITICAL SCHEDULING RULES:
    - Honor preferred days/times when specified
    - Keep in mind recovery needs of different muscle groups and activity types to avoid overtraining any specific body part.
    - Match activities to optimal weather conditions
+   - Try to keep the users preferred activity in mind when generating the plan.
 {multiple_activities_instruction.replace('13.', '   -')}
 
 5. **Weather Optimization**:
@@ -498,12 +601,11 @@ def export_to_google_calendar():
         from googleapiclient.discovery import build
         from googleapiclient.errors import HttpError
         import pytz
-        import json
         
         request_data = request.get_json() or {}
-        plan = request_data.get('plan', {})
+        plan_data = request_data.get('plan', {})
         
-        if not plan:
+        if not plan_data:
             return jsonify({'error': 'No plan data provided'}), 400
         
         # Parse the stored credentials
@@ -598,11 +700,11 @@ def export_to_google_calendar():
         tz = pytz.timezone(timezone)
         events_created = 0
         
-        print(f"[Calendar] Processing plan with {len(plan)} days")
-        print(f"[Calendar] Plan keys: {list(plan.keys())}")
+        print(f"[Calendar] Processing plan with {len(plan_data)} days")
+        print(f"[Calendar] Plan keys: {list(plan_data.keys())}")
         
         # Create events for each day in the plan
-        for date_key, day_data in plan.items():
+        for date_key, day_data in plan_data.items():
             try:
                 print(f"[Calendar] Processing day: {date_key}, data: {day_data}")
                 # Parse the date
@@ -667,7 +769,7 @@ def export_to_google_calendar():
         print(f"[Calendar] Total events created: {events_created}")
         
         if events_created == 0:
-            print(f"[Calendar] No events created - returning error")
+            print("[Calendar] No events created - returning error")
             return jsonify({
                 'success': False,
                 'message': 'No events were created. Your plan may only contain rest days.'

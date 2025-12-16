@@ -1,22 +1,22 @@
 """
-Third-party integrations (Fitbit, Google Fit, Oura) routes.
+Third-party integration routes for Fitbit, Google Fit, and Oura.
 """
-import os
-import json
-import random
 import base64
+import json
+import os
+import random
+from datetime import datetime
+from urllib.parse import quote
+
+import requests
 from flask import Blueprint, redirect, url_for, flash, request, session
 from flask_login import login_required, current_user
-from google_auth_oauthlib.flow import Flow
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
-from urllib.parse import quote
-from datetime import datetime
-import requests
+from google_auth_oauthlib.flow import Flow
 
-from models import db
 from config import config
-
+from models import db
 
 integrations_bp = Blueprint('integrations', __name__)
 
@@ -103,7 +103,11 @@ def callback_fitbit():
             
             # Fetch user's data from Fitbit API
             access_token = token_data['access_token']
-            today = datetime.now().strftime('%Y-%m-%d')
+            # Use current date for Fitbit API queries
+            try:
+                today = datetime.now().strftime('%Y-%m-%d')
+            except Exception:
+                today = datetime.utcnow().strftime('%Y-%m-%d')
             fitbit_headers = {'Authorization': f'Bearer {access_token}'}
             
             print(f"[Fitbit] Fetching data for user {current_user.id} on {today}")
@@ -119,7 +123,7 @@ def callback_fitbit():
             db.session.commit()
             session.pop('fitbit_state', None)
             
-            message = f'Fitbit connected successfully! '
+            message = 'Fitbit connected successfully! '
             if current_user.fitbit_readiness_score:
                 message += f'Readiness: {current_user.fitbit_readiness_score}/100'
             if current_user.fitbit_sleep_score:
@@ -194,6 +198,51 @@ def _fetch_fitbit_sleep(fitbit_headers, today):
         current_user.fitbit_sleep_score = None
 
 
+@integrations_bp.route('/debug/fitbit')
+@login_required
+def debug_fitbit():
+    """Return current Fitbit-related state for debugging alignment with the Fitbit app."""
+    token = None
+    try:
+        token = json.loads(current_user.fitbit_token) if current_user.fitbit_token else None
+    except Exception:
+        token = None
+    return {
+        'connected': bool(current_user.fitbit_connected),
+        'readiness_score': current_user.fitbit_readiness_score,
+        'sleep_score': current_user.fitbit_sleep_score,
+        'manual_readiness_score': current_user.manual_readiness_score,
+        'manual_sleep_score': current_user.manual_sleep_score,
+        'token_scopes': token.get('scope') if token else None,
+        'token_expires_in': token.get('expires_in') if token else None
+    }
+
+
+@integrations_bp.route('/refresh_fitbit', methods=['POST'])
+@login_required
+def refresh_fitbit():
+    """Re-fetch Fitbit readiness and sleep scores using stored token."""
+    try:
+        if not current_user.fitbit_connected or not current_user.fitbit_token:
+            flash('Fitbit is not connected.', 'error')
+            return redirect(url_for('planning.plan'))
+        token_data = json.loads(current_user.fitbit_token)
+        access_token = token_data.get('access_token')
+        if not access_token:
+            flash('Missing Fitbit access token.', 'error')
+            return redirect(url_for('planning.plan'))
+        headers = {'Authorization': f'Bearer {access_token}'}
+        # Use server local date; in most cases this will align after sync
+        today = datetime.now().strftime('%Y-%m-%d')
+        _fetch_fitbit_readiness(headers, today)
+        _fetch_fitbit_sleep(headers, today)
+        db.session.commit()
+        flash('Fitbit data refreshed.', 'success')
+    except Exception as e:
+        print(f"[Fitbit] Refresh error: {e}")
+        flash('Failed to refresh Fitbit data.', 'error')
+    return redirect(url_for('planning.plan'))
+
 @integrations_bp.route('/connect/google')
 @login_required
 def connect_google():
@@ -228,18 +277,29 @@ def connect_google():
 
 
 @integrations_bp.route('/callback/connect-google')
-@login_required
 def callback_connect_google():
     """Handle Google OAuth callback for connecting account."""
+    # Check if user is logged in - if not, redirect to login with a message
+    if not current_user.is_authenticated:
+        flash('Please log in first, then try connecting your Google account again.', 'warning')
+        return redirect(url_for('auth.login'))
+    
     if not config.GOOGLE_CLIENT_ID or not config.GOOGLE_CLIENT_SECRET:
         flash('Google OAuth is not configured.', 'error')
         return redirect(url_for('activities.log'))
     
-    # Verify state
-    state = session.get('connect_state')
-    if not state or state != request.args.get('state'):
-        flash('Invalid state parameter. Please try again.', 'error')
+    # Get state from request args (more reliable than session in Cloud Run)
+    state = request.args.get('state')
+    session_state = session.get('connect_state')
+    
+    # Accept state from either source
+    if not state:
+        flash('Missing state parameter. Please try again.', 'error')
         return redirect(url_for('activities.log'))
+    
+    # Warn but don't fail if session state doesn't match (Cloud Run session issues)
+    if session_state and session_state != state:
+        print(f"[Google Connect] State mismatch: session={session_state}, request={state}")
     
     try:
         # Create flow instance
@@ -326,7 +386,6 @@ def disconnect_google():
         if current_user.google_token:
             try:
                 # Parse token if it's JSON
-                import json
                 if current_user.google_token.startswith('{'):
                     token_data = json.loads(current_user.google_token)
                     access_token = token_data.get('access_token') or token_data.get('token')
@@ -385,9 +444,8 @@ def import_calendar_events():
     """Import events from Google Calendar as appointments.
     Note: CSRF validation handled by Flask-Login for authenticated users."""
     from flask import jsonify
+    from datetime import timedelta
     from models import Appointment
-    from datetime import datetime, timedelta
-    from flask_wtf.csrf import CSRFProtect
     
     print(f"[Calendar Import] Request from user {current_user.id}")
     

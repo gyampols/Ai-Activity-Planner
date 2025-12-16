@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Upgrade to Paid Tier - AI Activity Planner{% endblock %}
+
+{% block content %}
+<style>
+    .upgrade-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .upgrade-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .upgrade-header h1 {
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    
+    .upgrade-header p {
+        color: #7f8c8d;
+        font-size: 1.1rem;
+    }
+    
+    .pricing-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .pricing-header {
+        text-align: center;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #ecf0f1;
+        margin-bottom: 1.5rem;
+    }
+    
+    .pricing-header h2 {
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    
+    .price {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #27ae60;
+    }
+    
+    .price-subtitle {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+    
+    .features-list {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 2rem;
+    }
+    
+    .features-list li {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #ecf0f1;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .features-list li:last-child {
+        border-bottom: none;
+    }
+    
+    .features-list .check {
+        color: #27ae60;
+        font-size: 1.25rem;
+    }
+    
+    .features-list .feature-text {
+        color: #2c3e50;
+    }
+    
+    .upgrade-btn {
+        display: block;
+        width: 100%;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+        font-weight: bold;
+        text-align: center;
+        text-decoration: none;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .upgrade-btn.primary {
+        background: linear-gradient(135deg, #27ae60, #2ecc71);
+        color: white;
+    }
+    
+    .upgrade-btn.primary:hover {
+        background: linear-gradient(135deg, #219a52, #27ae60);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+    }
+    
+    .upgrade-btn.free {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+    }
+    
+    .upgrade-btn.free:hover {
+        background: linear-gradient(135deg, #2980b9, #1e6a9e);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+    
+    .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2rem;
+    }
+    
+    .comparison-table th,
+    .comparison-table td {
+        padding: 1rem;
+        text-align: center;
+        border-bottom: 1px solid #ecf0f1;
+    }
+    
+    .comparison-table th {
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+    
+    .comparison-table .feature-name {
+        text-align: left;
+        color: #2c3e50;
+    }
+    
+    .comparison-table .check-mark {
+        color: #27ae60;
+        font-size: 1.25rem;
+    }
+    
+    .comparison-table .x-mark {
+        color: #e74c3c;
+        font-size: 1.25rem;
+    }
+    
+    .already-paid-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #f39c12, #e74c3c);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+    }
+    
+    .back-link {
+        display: block;
+        text-align: center;
+        margin-top: 1.5rem;
+        color: #7f8c8d;
+        text-decoration: none;
+    }
+    
+    .back-link:hover {
+        color: #2c3e50;
+    }
+    
+    .secure-payment {
+        text-align: center;
+        margin-top: 1rem;
+        color: #7f8c8d;
+        font-size: 0.85rem;
+    }
+    
+    .secure-payment span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+</style>
+
+<div class="upgrade-container">
+    <div class="upgrade-header">
+        <h1>🚀 Upgrade to Paid Tier</h1>
+        <p>Get unlimited access to all features</p>
+    </div>
+    
+    <div class="pricing-card">
+        <div class="pricing-header">
+            {% if has_paid_before %}
+            <span class="already-paid-badge">🎉 Previous Customer</span>
+            <h2>Welcome Back!</h2>
+            <p class="price">FREE</p>
+            <p class="price-subtitle">Upgrade anytime at no cost</p>
+            {% else %}
+            <h2>Paid Tier</h2>
+            <p class="price">$1.00</p>
+            <p class="price-subtitle">One-time payment • Lifetime access</p>
+            {% endif %}
+        </div>
+        
+        <ul class="features-list">
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text"><strong>Unlimited</strong> plan generations per week</span>
+            </li>
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text">All weather data & forecasts</span>
+            </li>
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text">Fitbit & fitness tracker integration</span>
+            </li>
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text">Google Calendar sync</span>
+            </li>
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text">Priority customer support</span>
+            </li>
+            <li>
+                <span class="check">✓</span>
+                <span class="feature-text"><strong>Lifetime access</strong> - no recurring fees</span>
+            </li>
+        </ul>
+        
+        {% if has_paid_before %}
+        <form action="{{ url_for('payment.free_upgrade') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="upgrade-btn free">
+                ⚡ Upgrade Now (Free)
+            </button>
+        </form>
+        {% else %}
+        <form action="{{ url_for('payment.create_checkout_session') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="upgrade-btn primary">
+                💳 Upgrade Now - $1.00
+            </button>
+        </form>
+        <div class="secure-payment">
+            <span>🔒 Secure payment powered by Stripe</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="pricing-card">
+        <h3 style="text-align: center; color: #2c3e50; margin-bottom: 1rem;">Compare Plans</h3>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th class="feature-name">Feature</th>
+                    <th>Free Tier</th>
+                    <th>Paid Tier</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="feature-name">Plan generations per week</td>
+                    <td>3</td>
+                    <td>20</td>
+                </tr>
+                <tr>
+                    <td class="feature-name">Weather forecasts</td>
+                    <td><span class="check-mark">✓</span></td>
+                    <td><span class="check-mark">✓</span></td>
+                </tr>
+                <tr>
+                    <td class="feature-name">Activity management</td>
+                    <td><span class="check-mark">✓</span></td>
+                    <td><span class="check-mark">✓</span></td>
+                </tr>
+                <tr>
+                    <td class="feature-name">Fitness tracker integration</td>
+                    <td><span class="check-mark">✓</span></td>
+                    <td><span class="check-mark">✓</span></td>
+                </tr>
+                <tr>
+                    <td class="feature-name">Google Calendar sync</td>
+                    <td><span class="x-mark">✗</span></td>
+                    <td><span class="check-mark">✓</span></td>
+                </tr>
+                <tr>
+                    <td class="feature-name">Priority support</td>
+                    <td><span class="x-mark">✗</span></td>
+                    <td><span class="check-mark">✓</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <a href="{{ url_for('main.settings') }}" class="back-link">← Back to Settings</a>
+</div>
+{% endblock %}

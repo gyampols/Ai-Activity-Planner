@@ -206,3 +206,38 @@ def version():
         'environment': 'production' if not os.environ.get('FLASK_DEBUG') else 'development',
         'app_module': __name__
     })
+
+
+@main_bp.route('/health')
+def health_check():
+    """
+    Health check endpoint for load balancers and monitoring.
+    
+    Checks database connectivity and returns service status.
+    Returns 200 if healthy, 503 if unhealthy.
+    """
+    import time
+    from sqlalchemy import text
+    
+    health_status = {
+        'status': 'healthy',
+        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'checks': {}
+    }
+    
+    # Database connectivity check
+    try:
+        db.session.execute(text('SELECT 1'))
+        health_status['checks']['database'] = {
+            'status': 'healthy',
+            'message': 'Database connection successful'
+        }
+    except Exception as e:
+        health_status['status'] = 'unhealthy'
+        health_status['checks']['database'] = {
+            'status': 'unhealthy',
+            'message': str(e)
+        }
+    
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return jsonify(health_status), status_code

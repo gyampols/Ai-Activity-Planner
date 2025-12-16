@@ -1,45 +1,51 @@
 # AI Activity Planner
 
-A professional-grade Flask web application that generates personalized weekly activity plans using AI, real-time weather data, and fitness metrics.
+A production-grade Flask application for AI-powered weekly activity planning with weather integration, fitness tracking, and calendar sync.
 
 **Live App:** https://ai-activity-planner-300000255718.us-central1.run.app
 
 ## Features
 
-- **AI-Powered Planning**: GPT-4 integration for intelligent weekly activity scheduling
-- **Weather Integration**: Real-time 7-day forecasts with sunrise/sunset times
-- **Fitness Tracking**: Fitbit and Oura integration with manual score input option
-- **Google Calendar Sync**: One-click export and import from Google Calendar (no duplicates)
-- **User Authentication**: Secure login with Google OAuth support
-- **Persistent Form Data**: Cookie-based storage for additional info and last activity
-- **Responsive Design**: Optimized for desktop and mobile devices
-- **CI/CD Pipeline**: Automated testing and deployment with CircleCI
+- **AI-Powered Planning**: GPT-4 generates personalized weekly schedules
+- **Weather Integration**: 7-day forecasts with sunrise/sunset times
+- **Fitness Tracking**: Fitbit, Oura, and manual score input
+- **Google Calendar Sync**: One-click export with duplicate detection
+- **Subscription Tiers**: Free (3 plans/week) and Paid (unlimited) via Stripe
+- **User Authentication**: Email/password and Google OAuth
+- **Persistent Sessions**: 30-day remember-me cookies
+- **Responsive Design**: Mobile-optimized UI
 
 ## Tech Stack
 
 - **Backend**: Flask 3.0, SQLAlchemy, PostgreSQL
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript
-- **APIs**: OpenAI GPT-4, Open-Meteo Weather, Google Calendar
+- **APIs**: OpenAI GPT-4, Open-Meteo Weather, Google Calendar, Stripe
 - **Infrastructure**: Google Cloud Run, Cloud SQL
 - **Authentication**: Flask-Login, Google OAuth 2.0
+- **Email**: SendGrid
 
 ## Project Structure
 
 ```
-├── app.py              # Application entry point
-├── config.py           # Configuration management
-├── models.py           # Database models
+├── app.py              # Application factory
+├── config.py           # Configuration settings
+├── models.py           # SQLAlchemy ORM models
 ├── requirements.txt    # Python dependencies
-├── routes/            # Route handlers
-│   ├── activities.py  # Activity CRUD operations
-│   ├── auth.py        # Authentication & OAuth
-│   ├── integrations.py # Third-party integrations
-│   ├── main.py        # Core app routes
-│   └── planning.py    # AI planning & calendar export
-├── templates/         # Jinja2 templates
-├── utils/            # Helper functions
-│   └── helpers.py    # Weather & geolocation utilities
-└── instance/         # Runtime data (local only)
+├── routes/             # Blueprint route handlers
+│   ├── activities.py   # Activity/appointment CRUD
+│   ├── admin.py        # Admin panel
+│   ├── auth.py         # Authentication & OAuth
+│   ├── integrations.py # Fitbit, Google, Oura
+│   ├── main.py         # Core routes
+│   ├── payment.py      # Stripe payments
+│   └── planning.py     # AI planning & calendar
+├── utils/              # Utility modules
+│   ├── email.py        # SendGrid email
+│   ├── helpers.py      # Weather & geolocation
+│   └── status_logger.py # Audit logging
+├── templates/          # Jinja2 templates
+├── static/             # CSS, JS, images
+└── scripts/            # Migration scripts (archived)
 ```
 
 ## Setup
@@ -57,43 +63,32 @@ OPENAI_API_KEY=your-openai-key
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 DATABASE_URL=postgresql://user:pass@host/db
+STRIPE_SECRET_KEY=your-stripe-secret
+STRIPE_PUBLISHABLE_KEY=your-stripe-publishable
+STRIPE_WEBHOOK_SECRET=your-stripe-webhook
+SENDGRID_API_KEY=your-sendgrid-key
 ```
 
 ### Local Development
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Run migrations
-python migrate_db.py
-
-# Start development server
 python app.py
 ```
 
 ### Deployment
-See [DEPLOYMENT.md](DEPLOYMENT.md) for Cloud Run deployment instructions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for Google Cloud Run deployment.
 
-See [.circleci/README.md](.circleci/README.md) for CircleCI CI/CD setup instructions.
+## Architecture
 
-## Recent Updates
+The application follows a modular Flask architecture:
 
-### Calendar Import Enhancement
-- Google Calendar import now checks for duplicate events before importing
-- Compares title, date, and time to prevent duplicate appointments
-- Skips all-day events that already exist
+- **Application Factory** (`app.py`): Creates and configures the Flask app
+- **Blueprints** (`routes/`): Organized route handlers by feature
+- **ORM Models** (`models.py`): SQLAlchemy models with relationships
+- **Utilities** (`utils/`): Reusable helper functions
+- **Configuration** (`config.py`): Environment-based settings
 
-### Cookie-Based Form Persistence
-- "Last Activity Completed" field is automatically saved to cookies
-- "Additional Information" field is automatically saved to cookies
-- Values persist across sessions until cookies are cleared
-- 30-day cookie expiration
-
-### CI/CD Pipeline
-- Automated testing on every push
-- Automatic deployment to Cloud Run on main branch
-- Docker image building and caching
-- Environment variable management through CircleCI
+Database migrations are applied automatically on startup via SQLAlchemy.
 
 ## How to Use the App
 

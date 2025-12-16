@@ -4,6 +4,71 @@
 
 {% block extra_css %}
 <style>
+    /* Toggle switch styles */
+    .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.3s;
+        border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+        background-color: #27ae60;
+    }
+    
+    input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+    
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: #f8f9fa;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+    }
+    
+    .activity-item.disabled {
+        opacity: 0.5;
+        background: #e9ecef;
+    }
+    
+    .activity-info {
+        flex: 1;
+    }
+
     .calendar-grid {
         display: grid;
         grid-template-columns: repeat(7, 1fr);
@@ -75,19 +140,30 @@
     
     .weather-container {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 0.5rem;
-        justify-content: center;
+        justify-content: space-between;
+        overflow-x: auto;
     }
     
     .weather-day {
-        flex: 0 1 auto;
-        padding: 0.75rem;
+        flex: 1 1 0;
+        padding: 0.5rem;
         background: white;
         border-radius: 8px;
         text-align: center;
-        min-width: 90px;
+        min-width: 85px;
+        max-width: 120px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        font-size: 0.85rem;
+    }
+    
+    .weather-day strong {
+        font-size: 0.9rem;
+    }
+    
+    .weather-day small {
+        font-size: 0.75rem;
     }
     
     #loading {
@@ -241,45 +317,72 @@
     
     {% if weather_forecast %}
     <div class="weather-section">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-            <h3 style="margin: 0;">7-Day Weather Forecast</h3>
-            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.5rem 1rem; font-size: 0.9rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+                <h3 style="margin: 0; display: inline;">7-Day Weather Forecast</h3>
+                <span id="current-time" style="margin-left: 1rem; color: #666; font-size: 0.95rem;">🕐 --:--</span>
+            </div>
+            <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
                 Switch to °{{ 'C' if current_user.temperature_unit == 'F' else 'F' }}
             </button>
         </div>
         <div class="weather-container">
             {% for day in weather_forecast %}
-                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db; font-weight: 600;"{% endif %}>
-                    <strong>{{ day.date_short }}</strong>{% if day.is_today %}<br><span style="color: #3498db; font-size: 0.85rem;">(Today)</span>{% endif %}<br>
-                    🌡️ <span class="temp-display">{{ day.temp_max }}° / {{ day.temp_min }}°{{ current_user.temperature_unit or 'C' }}</span><br>
-                    💧 {{ day.precipitation }}%<br>
-                    <small style="color: #666;">
-                        🌅 {{ day.sunrise }}<br>
-                        🌇 {{ day.sunset }}
-                    </small>
+                <div class="weather-day" {% if day.is_today %}style="border: 2px solid #3498db;"{% endif %}>
+                    <strong>{{ day.date_short }}</strong>{% if day.is_today %} <span style="color: #3498db; font-size: 0.75rem;">(Today)</span>{% endif %}<br>
+                    🌡️ <span class="temp-display">{{ day.temp_max }}°/{{ day.temp_min }}°</span><br>
+                    {# Dynamic precipitation emoji based on weathercode #}
+                    {% set wc = day.weathercode|default(0)|int %}
+                    {% if wc in [95] %}⛈️{% elif wc in [96, 99] %}⛈️🧊{% elif wc in [71, 73, 75, 77, 85, 86] %}❄️{% elif wc in [56, 57, 66, 67] %}🌧️❄️{% elif wc in [51, 53, 55, 61, 63, 65, 80, 81, 82] %}🌧️{% else %}💧{% endif %}{{ day.precipitation }}%<br>
+                    ☁️{{ day.cloud_cover or 0 }}%<br>
+                    💨{{ day.wind_speed or 0 }}mph<br>
+                    <small style="color: #666;">🌅{{ day.sunrise }}<br> 🌇{{ day.sunset }}</small>
+                    {% if day.is_wet_ground or day.is_snowy_ground or day.is_windy %}
+                    <div style="font-size: 0.7rem; margin-top: 0.25rem;">
+                        {% if day.is_windy %}💨Windy{% endif %}
+                        {% if day.is_wet_ground %}⚠️Wet{% endif %}
+                        {% if day.is_snowy_ground %}❄️Snow{% endif %}
+                    </div>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
     </div>
+    <script>
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+            document.getElementById('current-time').textContent = '🕐 ' + timeStr;
+        }
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 60000);
+    </script>
     {% endif %}
 </div>
 
 <div class="card">
     <h2>Your Activities</h2>
     {% if activities %}
-        <div style="margin-top: 1rem;">
+        <p style="color: #666; font-size: 0.9rem; margin-bottom: 0.5rem;">Toggle activities to include/exclude from your plan:</p>
+        <div style="margin-top: 0.5rem;" id="activities-list">
             {% for activity in activities %}
-                <div style="background: #f8f9fa; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 4px;">
-                    <strong>{{ activity.name }}</strong>
-                    {% if activity.duration_minutes %}
-                        - {{ activity.duration_minutes }} min
-                    {% endif %}
-                    {% if activity.intensity %}
-                        ({{ activity.intensity }})
-                    {% endif %}
-                    {% if activity.dependencies %}
-                        - {{ activity.dependencies }}
-                    {% endif %}
+                <div class="activity-item" data-activity-id="{{ activity.id }}">
+                    <label class="toggle-switch">
+                        <input type="checkbox" class="activity-toggle" data-activity-id="{{ activity.id }}" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <div class="activity-info">
+                        <strong>{{ activity.name }}</strong>
+                        {% if activity.duration_minutes %}
+                            - {{ activity.duration_minutes }} min
+                        {% endif %}
+                        {% if activity.intensity %}
+                            ({{ activity.intensity }})
+                        {% endif %}
+                        {% if activity.dependencies %}
+                            - {{ activity.dependencies }}
+                        {% endif %}
+                    </div>
                 </div>
             {% endfor %}
         </div>
@@ -293,8 +396,11 @@
                     {% if current_user.fitbit_readiness_score %}<br>{% endif %}
                     <strong>Sleep Score:</strong> {{ current_user.fitbit_sleep_score }}%
                 {% endif %}
-                {% if not current_user.fitbit_readiness_score and not current_user.fitbit_sleep_score %}
-                    <strong>Fitbit Connected</strong> - Sync your device to see scores
+                {% if not current_user.fitbit_readiness_score %}
+                    <div style="margin-top:0.5rem; color:#155724;">
+                        Readiness not available yet. This can happen if Premium isn’t active or the day’s score hasn’t been finalized after device sync.
+                        <button id="refresh-fitbit" class="btn btn-sm" style="background:#218838; color:white; margin-left:0.5rem;">Refresh Fitbit Data</button>
+                    </div>
                 {% endif %}
             </div>
         {% elif current_user.oura_connected and current_user.oura_readiness_score %}
@@ -367,12 +473,22 @@
                 style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; margin-bottom: 1rem;"
             >
             
+            <label for="injuries-pains" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                🩹 Current Injuries or Pains (Optional)
+            </label>
+            <input 
+                type="text" 
+                id="injuries-pains" 
+                placeholder="e.g., sore knee, lower back pain, recovering from ankle sprain"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; margin-bottom: 1rem;"
+            >
+            
             <label for="extra-info" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
                 Additional Information (Optional)
             </label>
             <textarea 
                 id="extra-info" 
-                placeholder="Add any extra context for your plan (e.g., recovering from injury, training for event, specific goals, time constraints, etc.)"
+                placeholder="Add any extra context for your plan (e.g., training for event, specific goals, time constraints, etc.)"
                 style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; resize: vertical;"
             ></textarea>
         </div>
@@ -438,10 +554,99 @@
         return null;
     }
     
+    // Function to display persisted schedule on page load
+    function displayPersistedSchedule(plan, scheduleDate) {
+        const calendarContainer = document.getElementById('calendar-container');
+        const calendarGrid = document.getElementById('calendar-grid');
+        
+        if (!calendarContainer || !calendarGrid) return;
+        
+        // Check if this is a text-based schedule
+        if (plan.text) {
+            const fallbackDiv = document.createElement('div');
+            fallbackDiv.style.cssText = 'grid-column: 1/-1; padding: 1rem; background: #f8f9fa; border-radius: 4px; white-space: pre-wrap;';
+            fallbackDiv.textContent = plan.text;
+            calendarGrid.innerHTML = '';
+            calendarGrid.appendChild(fallbackDiv);
+        } else {
+            // Display as calendar
+            calendarGrid.innerHTML = '';
+            
+            // Sort by date keys to ensure proper order
+            const dateKeys = Object.keys(plan).sort();
+            
+            dateKeys.forEach(dateKey => {
+                const dayData = plan[dateKey];
+                const dayCard = document.createElement('div');
+                const isRest = (dayData.activity || '').toLowerCase().includes('rest');
+                dayCard.className = 'calendar-day' + (isRest ? ' rest-day' : '');
+                
+                // Create elements safely to prevent XSS
+                const header = document.createElement('div');
+                header.className = 'calendar-day-header';
+                header.textContent = dayData.day_name || dateKey;
+                dayCard.appendChild(header);
+                
+                const activity = document.createElement('div');
+                activity.className = 'calendar-activity';
+                activity.textContent = dayData.activity || 'No activity';
+                dayCard.appendChild(activity);
+                
+                if (dayData.notes) {
+                    const notes = document.createElement('div');
+                    notes.className = 'calendar-notes';
+                    notes.textContent = dayData.notes;
+                    dayCard.appendChild(notes);
+                }
+                
+                if (dayData.weather) {
+                    const weather = document.createElement('div');
+                    weather.className = 'calendar-weather';
+                    weather.textContent = '☁️ ' + dayData.weather;
+                    dayCard.appendChild(weather);
+                }
+                
+                calendarGrid.appendChild(dayCard);
+            });
+            
+            // Store plan data globally for export
+            window.currentPlan = plan;
+        }
+        
+        // Add a header showing when this schedule was generated
+        const headerDiv = calendarContainer.querySelector('div');
+        if (headerDiv && scheduleDate) {
+            const dateStr = new Date(scheduleDate).toLocaleDateString(undefined, { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            const existingBadge = headerDiv.querySelector('.persisted-badge');
+            if (existingBadge) existingBadge.remove();
+            
+            const badge = document.createElement('span');
+            badge.className = 'persisted-badge';
+            badge.style.cssText = 'font-size: 0.8rem; color: #666; margin-left: 0.5rem; font-weight: normal;';
+            badge.textContent = '(Generated ' + dateStr + ')';
+            headerDiv.querySelector('h2').appendChild(badge);
+        }
+        
+        // Show export button if Google is connected
+        const exportBtn = document.getElementById('export-calendar-btn');
+        if (exportBtn && !plan.text) {
+            exportBtn.style.display = '{% if current_user.google_id %}inline-block{% else %}none{% endif %}';
+        }
+        
+        calendarContainer.style.display = 'block';
+    }
+    
     // Load saved values from cookies on page load
     window.addEventListener('DOMContentLoaded', function() {
         const savedLastActivity = getCookie('lastActivity');
         const savedExtraInfo = getCookie('extraInfo');
+        const savedInjuriesPains = getCookie('injuriesPains');
         
         if (savedLastActivity) {
             const lastActivityInput = document.getElementById('last-activity');
@@ -456,6 +661,63 @@
                 extraInfoTextarea.value = savedExtraInfo;
             }
         }
+        
+        if (savedInjuriesPains) {
+            const injuriesInput = document.getElementById('injuries-pains');
+            if (injuriesInput) {
+                injuriesInput.value = savedInjuriesPains;
+            }
+        }
+        
+        // Load saved activity toggle states from cookies
+        const savedActivityToggles = getCookie('activityToggles');
+        let toggleStates = {};
+        if (savedActivityToggles) {
+            try {
+                toggleStates = JSON.parse(savedActivityToggles);
+            } catch (e) {
+                toggleStates = {};
+            }
+        }
+        
+        // Activity toggle handlers
+        document.querySelectorAll('.activity-toggle').forEach(toggle => {
+            const activityId = toggle.dataset.activityId;
+            
+            // Restore saved state if available
+            if (toggleStates.hasOwnProperty(activityId)) {
+                toggle.checked = toggleStates[activityId];
+                const activityItem = toggle.closest('.activity-item');
+                if (!toggle.checked) {
+                    activityItem.classList.add('disabled');
+                }
+            }
+            
+            toggle.addEventListener('change', function() {
+                const activityItem = this.closest('.activity-item');
+                if (this.checked) {
+                    activityItem.classList.remove('disabled');
+                } else {
+                    activityItem.classList.add('disabled');
+                }
+                
+                // Save all toggle states to cookies
+                const currentStates = {};
+                document.querySelectorAll('.activity-toggle').forEach(t => {
+                    currentStates[t.dataset.activityId] = t.checked;
+                });
+                setCookie('activityToggles', JSON.stringify(currentStates), 30);
+            });
+        });
+        
+        // Load and display persisted schedule if available
+        {% if last_schedule %}
+        const lastSchedule = {{ last_schedule | tojson | safe }};
+        const lastScheduleDate = '{{ last_schedule_date }}';
+        if (lastSchedule && Object.keys(lastSchedule).length > 0) {
+            displayPersistedSchedule(lastSchedule, lastScheduleDate);
+        }
+        {% endif %}
     });
     
     // Manual fitness score handlers
@@ -530,7 +792,16 @@
         const calendarGrid = document.getElementById('calendar-grid');
         const extraInfo = document.getElementById('extra-info')?.value || '';
         const lastActivity = document.getElementById('last-activity')?.value || '';
+        const injuriesPains = document.getElementById('injuries-pains')?.value || '';
         const allowMultiple = document.getElementById('allow-multiple-activities')?.checked || false;
+        
+        // Get excluded activity IDs (unchecked toggles)
+        const excludedActivityIds = [];
+        document.querySelectorAll('.activity-toggle').forEach(toggle => {
+            if (!toggle.checked) {
+                excludedActivityIds.push(parseInt(toggle.dataset.activityId));
+            }
+        });
         
         // Save values to cookies for future use
         if (lastActivity) {
@@ -538,6 +809,9 @@
         }
         if (extraInfo) {
             setCookie('extraInfo', extraInfo, 30);
+        }
+        if (injuriesPains) {
+            setCookie('injuriesPains', injuriesPains, 30);
         }
         
         btn.disabled = true;
@@ -554,7 +828,9 @@
                 body: JSON.stringify({
                     extra_info: extraInfo,
                     last_activity: lastActivity,
-                    allow_multiple_activities: allowMultiple
+                    injuries_pains: injuriesPains,
+                    allow_multiple_activities: allowMultiple,
+                    excluded_activity_ids: excludedActivityIds
                 })
             });
             
@@ -760,6 +1036,24 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = '📅 Export to Google Calendar';
+            }
+        });
+    }
+
+    // Refresh Fitbit data
+    const refreshFitbitBtn = document.getElementById('refresh-fitbit');
+    if (refreshFitbitBtn) {
+        refreshFitbitBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            try {
+                const resp = await fetch('/refresh_fitbit', { method: 'POST' });
+                if (resp.redirected) {
+                    window.location.href = resp.url;
+                } else {
+                    window.location.reload();
+                }
+            } catch (err) {
+                console.error('Refresh Fitbit failed', err);
             }
         });
     }

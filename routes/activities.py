@@ -1,12 +1,12 @@
 """
 Activity and appointment management routes.
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_login import login_required, current_user
 from datetime import datetime as dt
 
-from models import db, Activity, Appointment
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_login import login_required, current_user
 
+from models import db, Activity, Appointment
 
 activities_bp = Blueprint('activities', __name__)
 

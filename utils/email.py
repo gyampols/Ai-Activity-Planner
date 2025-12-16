@@ -1,21 +1,30 @@
 """
-Email utility functions for sending verification and password reset emails.
+Email utility functions for verification and password reset.
 """
 import os
 import secrets
 from datetime import datetime, timedelta
-from flask import url_for
+from typing import Optional
 
 
-def generate_token():
-    """Generate a secure random token."""
+def generate_token() -> str:
+    """Generate a cryptographically secure random token."""
     return secrets.token_urlsafe(32)
 
 
-def send_email(to_email, subject, html_content):
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
     """
     Send email using SendGrid API.
+
     Falls back to console logging if SendGrid is not configured.
+
+    Args:
+        to_email: Recipient email address.
+        subject: Email subject line.
+        html_content: HTML body content.
+
+    Returns:
+        True if email sent successfully, False otherwise.
     """
     sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
     from_email = os.environ.get('EMAIL_FROM', 'noreply@aiactivityplanner.com')

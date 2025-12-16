@@ -130,8 +130,11 @@
                     {% if current_user.subscription_tier == 'admin' %}
                         <p><strong>Weekly Plan Generations:</strong> Unlimited ♾️</p>
                         <p class="usage-note">You have unlimited access to all features.</p>
+                    {% elif current_user.subscription_tier == 'paid_tier' %}
+                        <p><strong>Weekly Plan Generations:</strong> Unlimited ♾️</p>
+                        <p class="usage-note">You have unlimited access as a paid member.</p>
                     {% else %}
-                        {% set limit = 20 if current_user.subscription_tier == 'paid_tier' else 3 %}
+                        {% set limit = 3 %}
                         {% set used = current_user.plan_generations_count or 0 %}
                         {% set remaining = limit - used %}
                         
@@ -167,11 +170,11 @@
                             <li>✅ Weather-based planning</li>
                             <li>✅ Calendar sync</li>
                             <li>✅ Priority support</li>
+                            <li>✅ Lifetime access</li>
                         {% else %}
                             <li>✅ 3 AI plan generations per week</li>
                             <li>✅ All integrations (Fitbit, Oura, Google)</li>
                             <li>✅ Weather-based planning</li>
-                            <li>✅ Calendar sync</li>
                         {% endif %}
                     </ul>
                 </div>
@@ -307,21 +310,34 @@
 <div id="upgradeModal" class="modal">
     <div class="modal-content">
         <h2>Upgrade to Paid Plan</h2>
-        <p>Upgrade to unlock more features:</p>
+        {% if current_user.has_paid_before %}
+        <p>🎉 Welcome back! Since you've previously purchased the paid plan, you can upgrade again for free!</p>
         <ul>
-            <li>20 AI plan generations per week (vs 3 on free)</li>
+            <li>Unlimited AI plan generations per week</li>
             <li>Priority support</li>
-            <li>Early access to new features</li>
+            <li>All premium features</li>
         </ul>
-        <p><strong>Price:</strong> Contact admin for pricing</p>
-        <form method="POST" action="{{ url_for('main.update_subscription') }}">
+        <form method="POST" action="{{ url_for('payment.free_upgrade') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="new_tier" value="paid_tier"/>
             <div class="modal-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeUpgradeModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Confirm Upgrade</button>
+                <button type="submit" class="btn btn-primary">Upgrade Now (Free)</button>
             </div>
         </form>
+        {% else %}
+        <p>Upgrade to unlock more features:</p>
+        <ul>
+            <li>Unlimited AI plan generations per week</li>
+            <li>Priority support</li>
+            <li>Early access to new features</li>
+            <li>Lifetime access - one-time payment</li>
+        </ul>
+        <p><strong>Price:</strong> $1.00 (one-time payment)</p>
+        <div class="modal-buttons">
+            <button type="button" class="btn btn-secondary" onclick="closeUpgradeModal()">Cancel</button>
+            <a href="{{ url_for('payment.upgrade_page') }}" class="btn btn-primary">View Upgrade Options</a>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -335,9 +351,9 @@
             <li>Lose priority support</li>
             <li>Keep all your data and activities</li>
         </ul>
-        <form method="POST" action="{{ url_for('main.update_subscription') }}">
+        <p style="color: #27ae60;"><strong>💡 Don't worry!</strong> You can upgrade again anytime without paying again.</p>
+        <form method="POST" action="{{ url_for('payment.downgrade') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="new_tier" value="free_tier"/>
             <div class="modal-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeDowngradeModal()">Cancel</button>
                 <button type="submit" class="btn btn-danger">Confirm Downgrade</button>
