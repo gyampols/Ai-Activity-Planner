@@ -157,9 +157,25 @@ def logout():
     return redirect(url_for('main.index'))
 
 
+@auth_bp.route('/login/google/warning')
+def login_google_warning():
+    """Show warning page before Google OAuth."""
+    return render_template(
+        'google_oauth_warning.html',
+        continue_url=url_for('auth.login_google_continue'),
+        back_url=url_for('auth.login')
+    )
+
+
 @auth_bp.route('/login/google')
 def login_google():
-    """Initiate Google OAuth login flow."""
+    """Redirect to warning page first."""
+    return redirect(url_for('auth.login_google_warning'))
+
+
+@auth_bp.route('/login/google/continue')
+def login_google_continue():
+    """Initiate Google OAuth login flow after user confirms."""
     if not config.GOOGLE_CLIENT_ID or not config.GOOGLE_CLIENT_SECRET:
         flash('Google OAuth is not configured. Please contact the administrator.', 'error')
         return redirect(url_for('auth.login'))

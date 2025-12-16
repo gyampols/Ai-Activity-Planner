@@ -9,7 +9,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 import requests
-from flask import Blueprint, redirect, url_for, flash, request, session
+from flask import Blueprint, redirect, url_for, flash, request, session, render_template
 from flask_login import login_required, current_user
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -243,10 +243,28 @@ def refresh_fitbit():
         flash('Failed to refresh Fitbit data.', 'error')
     return redirect(url_for('planning.plan'))
 
+@integrations_bp.route('/connect/google/warning')
+@login_required
+def connect_google_warning():
+    """Show warning page before Google OAuth connection."""
+    return render_template(
+        'google_oauth_warning.html',
+        continue_url=url_for('integrations.connect_google_continue'),
+        back_url=url_for('activities.log')
+    )
+
+
 @integrations_bp.route('/connect/google')
 @login_required
 def connect_google():
-    """Connect Google account to existing user."""
+    """Redirect to warning page first."""
+    return redirect(url_for('integrations.connect_google_warning'))
+
+
+@integrations_bp.route('/connect/google/continue')
+@login_required
+def connect_google_continue():
+    """Connect Google account to existing user after confirmation."""
     if not config.GOOGLE_CLIENT_ID or not config.GOOGLE_CLIENT_SECRET:
         flash('Google OAuth is not configured.', 'error')
         return redirect(url_for('activities.log'))
