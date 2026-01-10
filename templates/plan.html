@@ -469,6 +469,7 @@
             <input 
                 type="text" 
                 id="last-activity" 
+                value="{{ last_completed_activity }}"
                 placeholder="e.g., 5k run, yoga session, strength training"
                 style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; margin-bottom: 1rem;"
             >
@@ -479,6 +480,7 @@
             <input 
                 type="text" 
                 id="injuries-pains" 
+                value="{{ current_injuries }}"
                 placeholder="e.g., sore knee, lower back pain, recovering from ankle sprain"
                 style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; margin-bottom: 1rem;"
             >
@@ -490,7 +492,7 @@
                 id="extra-info" 
                 placeholder="Add any extra context for your plan (e.g., training for event, specific goals, time constraints, etc.)"
                 style="width: 100%; min-height: 80px; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; resize: vertical;"
-            ></textarea>
+            >{{ additional_information }}</textarea>
         </div>
         
         <button id="generate-btn" class="btn btn-success" style="margin-top: 1rem;">
@@ -642,33 +644,8 @@
         calendarContainer.style.display = 'block';
     }
     
-    // Load saved values from cookies on page load
+    // Activity toggles and page load handling
     window.addEventListener('DOMContentLoaded', function() {
-        const savedLastActivity = getCookie('lastActivity');
-        const savedExtraInfo = getCookie('extraInfo');
-        const savedInjuriesPains = getCookie('injuriesPains');
-        
-        if (savedLastActivity) {
-            const lastActivityInput = document.getElementById('last-activity');
-            if (lastActivityInput) {
-                lastActivityInput.value = savedLastActivity;
-            }
-        }
-        
-        if (savedExtraInfo) {
-            const extraInfoTextarea = document.getElementById('extra-info');
-            if (extraInfoTextarea) {
-                extraInfoTextarea.value = savedExtraInfo;
-            }
-        }
-        
-        if (savedInjuriesPains) {
-            const injuriesInput = document.getElementById('injuries-pains');
-            if (injuriesInput) {
-                injuriesInput.value = savedInjuriesPains;
-            }
-        }
-        
         // Load saved activity toggle states from cookies
         const savedActivityToggles = getCookie('activityToggles');
         let toggleStates = {};
@@ -803,16 +780,7 @@
             }
         });
         
-        // Save values to cookies for future use
-        if (lastActivity) {
-            setCookie('lastActivity', lastActivity, 30);
-        }
-        if (extraInfo) {
-            setCookie('extraInfo', extraInfo, 30);
-        }
-        if (injuriesPains) {
-            setCookie('injuriesPains', injuriesPains, 30);
-        }
+        // Values are now saved to database automatically when plan is generated
         
         btn.disabled = true;
         btn.textContent = 'Generating...';
@@ -1009,9 +977,41 @@
             
             const btn = this;
             btn.disabled = true;
-            btn.textContent = 'Exporting...';
+            btn.textContent = 'Checking for conflicts...';
             
             try {
+                // First, check for conflicts
+                const checkResponse = await fetch('{{ url_for("planning.check_calendar_conflicts") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        plan: window.currentPlan
+                    })
+                });
+                
+                const checkData = await checkResponse.json();
+                
+                // If there are conflicts, ask user what to do
+                if (checkResponse.ok && checkData.hasConflicts) {
+                    const userChoice = confirm(
+                        `⚠️ ${checkData.message}\n\n` +
+                        `Do you want to update those events with your new plan?\n\n` +
+                        `• Click OK to update existing events\n` +
+                        `• Click Cancel to abort export`
+                    );
+                    
+                    if (!userChoice) {
+                        btn.disabled = false;
+                        btn.textContent = '📅 Export to Google Calendar';
+                        return; // User chose to cancel
+                    }
+                }
+                
+                // Proceed with export
+                btn.textContent = 'Exporting...';
+                
                 const response = await fetch('{{ url_for("planning.export_to_google_calendar") }}', {
                     method: 'POST',
                     headers: {
@@ -1025,7 +1025,11 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
-                    alert('✅ ' + data.message + '\n\nCheck your Google Calendar to see the events.');
+                    let message = '✅ ' + data.message + '\n\nCheck your Google Calendar to see the events.';
+                    if (data.updated > 0) {
+                        message += `\n\n📝 Note: ${data.updated} existing event(s) were updated.`;
+                    }
+                    alert(message);
                 } else if (response.status === 403) {
                     alert('⚠️ ' + (data.error || 'Calendar access denied') + '\n\nTip: You may need to disconnect and reconnect your Google account to grant calendar permissions.');
                 } else {

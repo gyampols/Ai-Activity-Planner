@@ -1,7 +1,7 @@
 """
 Activity and appointment management routes.
 """
-from datetime import datetime as dt
+from datetime import datetime as dt, date
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
@@ -14,9 +14,16 @@ activities_bp = Blueprint('activities', __name__)
 @activities_bp.route('/log')
 @login_required
 def log():
-    """Display user's activities and appointments."""
+    """Display user's activities and upcoming appointments."""
     activities = Activity.query.filter_by(user_id=current_user.id).all()
-    appointments = Appointment.query.filter_by(user_id=current_user.id).order_by(Appointment.date.asc()).all()
+    
+    # Only show appointments from today onwards
+    today = date.today()
+    appointments = Appointment.query.filter(
+        Appointment.user_id == current_user.id,
+        Appointment.date >= today
+    ).order_by(Appointment.date.asc()).all()
+    
     return render_template('log.html', activities=activities, appointments=appointments)
 
 

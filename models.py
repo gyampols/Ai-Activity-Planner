@@ -69,6 +69,11 @@ class User(UserMixin, db.Model):
     last_generated_schedule = db.Column(db.Text, nullable=True)
     last_schedule_date = db.Column(db.DateTime, nullable=True)
     
+    # Planning context (previously stored in cookies)
+    last_completed_activity = db.Column(db.String(500), nullable=True)
+    current_injuries = db.Column(db.String(500), nullable=True)
+    additional_information = db.Column(db.Text, nullable=True)
+    
     # Admin
     test_flag = db.Column(db.Boolean, default=False, nullable=False)
     

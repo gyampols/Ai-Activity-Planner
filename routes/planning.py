@@ -60,7 +60,10 @@ def plan():
                            activities=activities, 
                            weather_forecast=weather_forecast,
                            last_schedule=last_schedule,
-                           last_schedule_date=last_schedule_date)
+                           last_schedule_date=last_schedule_date,
+                           last_completed_activity=current_user.last_completed_activity or '',
+                           current_injuries=current_user.current_injuries or '',
+                           additional_information=current_user.additional_information or '')
 
 
 @planning_bp.route('/debug/weather')
@@ -165,6 +168,13 @@ def generate_plan():
         injuries_pains = request_data.get('injuries_pains', '').strip()
         allow_multiple = request_data.get('allow_multiple_activities', False)
         excluded_activity_ids = request_data.get('excluded_activity_ids', [])
+        
+        # Save these values to user profile for persistence
+        current_user.last_completed_activity = last_activity if last_activity else None
+        current_user.current_injuries = injuries_pains if injuries_pains else None
+        current_user.additional_information = extra_info if extra_info else None
+        db.session.commit()
+        
     except (TypeError, AttributeError, KeyError):
         extra_info = ''
         injuries_pains = ''
@@ -582,6 +592,127 @@ def _generate_mock_plan(activities, now, weather_forecast):
     return {'plan': mock_plan, 'structured': True}
 
 
+@planning_bp.route('/check_calendar_conflicts', methods=['POST'])
+@login_required
+def check_calendar_conflicts():
+    """Check if there are existing events from this app that would conflict with the export."""
+    user_tier = current_user.subscription_tier or 'free_tier'
+    if user_tier not in ['paid_tier', 'admin']:
+        return jsonify({'error': 'Calendar export is only available for Paid and Admin tiers.'}), 403
+    
+    if not current_user.google_token:
+        return jsonify({'error': 'Google account not connected.'}), 403
+    
+    try:
+        from googleapiclient.discovery import build
+        from google.oauth2.credentials import Credentials
+        import pytz
+        
+        request_data = request.get_json() or {}
+        plan_data = request_data.get('plan', {})
+        
+        if not plan_data:
+            return jsonify({'error': 'No plan data provided'}), 400
+        
+        # Parse credentials (same as export function)
+        if current_user.google_token.startswith('{'):
+            credentials_dict = json.loads(current_user.google_token)
+            creds = Credentials(
+                token=credentials_dict.get('token'),
+                refresh_token=credentials_dict.get('refresh_token'),
+                token_uri=credentials_dict.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                client_id=credentials_dict.get('client_id', config.GOOGLE_CLIENT_ID),
+                client_secret=credentials_dict.get('client_secret', config.GOOGLE_CLIENT_SECRET),
+                scopes=credentials_dict.get('scopes')
+            )
+        else:
+            creds = Credentials(
+                token=current_user.google_token,
+                refresh_token=current_user.google_refresh_token,
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=config.GOOGLE_CLIENT_ID,
+                client_secret=config.GOOGLE_CLIENT_SECRET,
+                scopes=config.GOOGLE_SCOPES
+            )
+        
+        # Refresh token if needed
+        if creds.refresh_token:
+            try:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                credentials_dict = {
+                    'token': creds.token,
+                    'refresh_token': creds.refresh_token,
+                    'token_uri': creds.token_uri,
+                    'client_id': creds.client_id,
+                    'client_secret': creds.client_secret,
+                    'scopes': creds.scopes
+                }
+                current_user.google_token = json.dumps(credentials_dict)
+                current_user.google_refresh_token = creds.refresh_token
+                db.session.commit()
+            except Exception as refresh_error:
+                return jsonify({
+                    'error': 'Your Google connection has expired. Please disconnect and reconnect.',
+                    'reconnect_required': True
+                }), 401
+        
+        # Build calendar service
+        service = build('calendar', 'v3', credentials=creds)
+        
+        # Get timezone
+        timezone = 'UTC'
+        if current_user.location:
+            temp_unit = current_user.temperature_unit or 'C'
+            weather_data = get_weather_forecast(current_user.location, temp_unit)
+            if weather_data:
+                timezone = weather_data.get('timezone', 'UTC')
+        
+        tz = pytz.timezone(timezone)
+        
+        # Check for existing events with our tag
+        plan_dates = list(plan_data.keys())
+        if plan_dates:
+            first_date = datetime.strptime(min(plan_dates), '%Y-%m-%d')
+            last_date = datetime.strptime(max(plan_dates), '%Y-%m-%d') + timedelta(days=1)
+            
+            time_min = tz.localize(first_date).isoformat()
+            time_max = tz.localize(last_date).isoformat()
+            
+            existing_events_result = service.events().list(
+                calendarId='primary',
+                timeMin=time_min,
+                timeMax=time_max,
+                privateExtendedProperty='exportedFrom=aiActivityPlanner',
+                singleEvents=True
+            ).execute()
+            
+            existing_tagged_events = existing_events_result.get('items', [])
+            
+            if existing_tagged_events:
+                return jsonify({
+                    'hasConflicts': True,
+                    'conflictCount': len(existing_tagged_events),
+                    'message': f'Found {len(existing_tagged_events)} event(s) previously exported from this app in the same date range.'
+                })
+            else:
+                return jsonify({
+                    'hasConflicts': False,
+                    'message': 'No conflicts found.'
+                })
+        else:
+            return jsonify({
+                'hasConflicts': False,
+                'message': 'No plan dates to check.'
+            })
+    
+    except Exception as e:
+        import traceback
+        print(f"Conflict check error: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Failed to check for conflicts: {str(e)}'}), 500
+
+
 @planning_bp.route('/export_to_google_calendar', methods=['POST'])
 @login_required
 def export_to_google_calendar():
@@ -649,34 +780,38 @@ def export_to_google_calendar():
         
         print(f"[Calendar] Token expired: {creds.expired}, Has refresh token: {bool(creds.refresh_token)}")
         
-        # Try to introspect the token to see what scopes it actually has
-        try:
-            import requests as req
-            token_info_url = f"https://oauth2.googleapis.com/tokeninfo?access_token={creds.token}"
-            token_response = req.get(token_info_url, timeout=5)
-            if token_response.status_code == 200:
-                token_info = token_response.json()
-                actual_scopes = token_info.get('scope', '').split()
-                print(f"[Calendar] Token info from Google: scopes={actual_scopes}")
-                if 'https://www.googleapis.com/auth/calendar.events' not in actual_scopes:
-                    print(f"[Calendar] ERROR: Token does NOT have calendar scope! Only has: {actual_scopes}")
-            else:
-                print(f"[Calendar] Token introspection failed: {token_response.status_code}")
-        except Exception as e:
-            print(f"[Calendar] Token introspection error: {e}")
-        
-        # Refresh token if expired (this will also ensure scopes are validated)
-        if creds.expired and creds.refresh_token:
+        # Always try to refresh if we have a refresh token (handles both expired and revoked tokens)
+        if creds.refresh_token:
             try:
                 from google.auth.transport.requests import Request
+                print(f"[Calendar] Attempting to refresh token for user {current_user.id}")
                 creds.refresh(Request())
-                # Update stored token
-                current_user.google_token = creds.token
+                
+                # Update stored token with new credentials
+                credentials_dict = {
+                    'token': creds.token,
+                    'refresh_token': creds.refresh_token,
+                    'token_uri': creds.token_uri,
+                    'client_id': creds.client_id,
+                    'client_secret': creds.client_secret,
+                    'scopes': creds.scopes
+                }
+                current_user.google_token = json.dumps(credentials_dict)
+                current_user.google_refresh_token = creds.refresh_token
                 db.session.commit()
-                print(f"[Calendar] Token refreshed for user {current_user.id}")
-            except Exception as e:
-                print(f"[Calendar] Token refresh failed: {e}")
-                return jsonify({'error': f'Failed to refresh access token. Please reconnect your Google account. Error: {str(e)}'}), 401
+                print(f"[Calendar] Token refreshed successfully for user {current_user.id}")
+            except Exception as refresh_error:
+                print(f"[Calendar] Token refresh failed: {refresh_error}")
+                return jsonify({
+                    'error': 'Your Google connection has expired. Please disconnect and reconnect your Google account.',
+                    'reconnect_required': True
+                }), 401
+        elif creds.expired:
+            print(f"[Calendar] Token expired but no refresh token available")
+            return jsonify({
+                'error': 'Your Google connection has expired and cannot be refreshed. Please disconnect and reconnect your Google account.',
+                'reconnect_required': True
+            }), 401
         
         # Build Calendar API service
         try:
@@ -699,6 +834,46 @@ def export_to_google_calendar():
         
         tz = pytz.timezone(timezone)
         events_created = 0
+        events_updated = 0
+        
+        # Check for existing events with our tag (exported from this app)
+        # We'll look for events in the date range of the plan
+        plan_dates = list(plan_data.keys())
+        if plan_dates:
+            first_date = datetime.strptime(min(plan_dates), '%Y-%m-%d')
+            last_date = datetime.strptime(max(plan_dates), '%Y-%m-%d') + timedelta(days=1)
+            
+            time_min = tz.localize(first_date).isoformat()
+            time_max = tz.localize(last_date).isoformat()
+            
+            print(f"[Calendar] Checking for existing tagged events between {time_min} and {time_max}")
+            
+            try:
+                existing_events_result = service.events().list(
+                    calendarId='primary',
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    privateExtendedProperty='exportedFrom=aiActivityPlanner',
+                    singleEvents=True
+                ).execute()
+                
+                existing_tagged_events = existing_events_result.get('items', [])
+                print(f"[Calendar] Found {len(existing_tagged_events)} existing tagged events")
+                
+                # Build a map of existing events by date for conflict checking
+                existing_events_by_date = {}
+                for evt in existing_tagged_events:
+                    start = evt['start'].get('dateTime', evt['start'].get('date'))
+                    if 'dateTime' in evt['start']:
+                        evt_date = datetime.fromisoformat(start.replace('Z', '+00:00')).date().isoformat()
+                        existing_events_by_date[evt_date] = evt
+                
+                print(f"[Calendar] Existing events by date: {list(existing_events_by_date.keys())}")
+            except Exception as e:
+                print(f"[Calendar] Error checking existing events: {e}")
+                existing_events_by_date = {}
+        else:
+            existing_events_by_date = {}
         
         print(f"[Calendar] Processing plan with {len(plan_data)} days")
         print(f"[Calendar] Plan keys: {list(plan_data.keys())}")
@@ -743,7 +918,7 @@ def export_to_google_calendar():
                 if day_data.get('weather'):
                     description += f"\n\nWeather: {day_data['weather']}"
                 
-                # Create the event
+                # Create the event with our custom identifier tag
                 event = {
                     'summary': activity,
                     'description': description,
@@ -756,28 +931,56 @@ def export_to_google_calendar():
                         'timeZone': timezone,
                     },
                     'colorId': '9',  # Blue color for activities
+                    'extendedProperties': {
+                        'private': {
+                            'exportedFrom': 'aiActivityPlanner',
+                            'exportedAt': datetime.utcnow().isoformat()
+                        }
+                    }
                 }
                 
-                service.events().insert(calendarId='primary', body=event).execute()
-                events_created += 1
-                print(f"[Calendar] Created event for {date_key}: {activity}")
+                # Check if we have an existing event for this date
+                if date_key in existing_events_by_date:
+                    # Update the existing event instead of creating a new one
+                    existing_event = existing_events_by_date[date_key]
+                    event_id = existing_event['id']
+                    print(f"[Calendar] Updating existing event {event_id} for {date_key}")
+                    service.events().update(calendarId='primary', eventId=event_id, body=event).execute()
+                    events_updated += 1
+                    print(f"[Calendar] Updated event for {date_key}: {activity}")
+                else:
+                    # Create new event
+                    service.events().insert(calendarId='primary', body=event).execute()
+                    events_created += 1
+                    print(f"[Calendar] Created event for {date_key}: {activity}")
                 
             except Exception as e:
                 print(f"[Calendar] Error creating event for {date_key}: {e}")
                 continue
         
-        print(f"[Calendar] Total events created: {events_created}")
+        print(f"[Calendar] Total events created: {events_created}, updated: {events_updated}")
         
-        if events_created == 0:
-            print("[Calendar] No events created - returning error")
+        if events_created == 0 and events_updated == 0:
+            print("[Calendar] No events created or updated - returning error")
             return jsonify({
                 'success': False,
                 'message': 'No events were created. Your plan may only contain rest days.'
             }), 200
         
+        # Build success message
+        message_parts = []
+        if events_created > 0:
+            message_parts.append(f'created {events_created} new event{"s" if events_created != 1 else ""}')
+        if events_updated > 0:
+            message_parts.append(f'updated {events_updated} existing event{"s" if events_updated != 1 else ""}')
+        
+        message = f'Successfully {" and ".join(message_parts)}!'
+        
         return jsonify({
             'success': True,
-            'message': f'Successfully created {events_created} calendar event{"s" if events_created != 1 else ""}!'
+            'message': message,
+            'created': events_created,
+            'updated': events_updated
         })
         
     except HttpError as e:

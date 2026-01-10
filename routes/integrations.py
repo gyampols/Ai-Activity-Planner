@@ -522,6 +522,34 @@ def import_calendar_events():
             scopes=scopes
         )
         
+        # Always try to refresh if we have a refresh token
+        if refresh_token:
+            try:
+                from google.auth.transport.requests import Request
+                print(f"[Calendar Import] Refreshing token...")
+                creds.refresh(Request())
+                
+                # Update stored token
+                credentials_dict = {
+                    'token': creds.token,
+                    'refresh_token': creds.refresh_token,
+                    'token_uri': creds.token_uri,
+                    'client_id': creds.client_id,
+                    'client_secret': creds.client_secret,
+                    'scopes': creds.scopes
+                }
+                current_user.google_token = json.dumps(credentials_dict)
+                current_user.google_refresh_token = creds.refresh_token
+                db.session.commit()
+                print(f"[Calendar Import] Token refreshed successfully")
+            except Exception as refresh_error:
+                print(f"[Calendar Import] Token refresh failed: {refresh_error}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Your Google connection has expired. Please disconnect and reconnect your Google account.',
+                    'reconnect_required': True
+                }), 401
+        
         print(f"[Calendar Import] Building calendar service...")
         
         # Build calendar service
@@ -546,8 +574,17 @@ def import_calendar_events():
         
         events = events_result.get('items', [])
         imported_count = 0
+        skipped_exported = 0
         
         for event in events:
+            # Skip events that were exported from our app
+            extended_props = event.get('extendedProperties', {})
+            private_props = extended_props.get('private', {})
+            if private_props.get('exportedFrom') == 'aiActivityPlanner':
+                print(f"[Calendar Import] Skipping app-exported event: {event.get('summary', 'Untitled')}")
+                skipped_exported += 1
+                continue
+            
             # Skip if no summary (title)
             if 'summary' not in event:
                 continue
@@ -632,12 +669,18 @@ def import_calendar_events():
         
         db.session.commit()
         
-        print(f"[Calendar Import] Successfully imported {imported_count} events for user {current_user.id}")
+        print(f"[Calendar Import] Successfully imported {imported_count} events for user {current_user.id}, skipped {skipped_exported} app-exported events")
+        
+        # Build success message
+        message = f'Successfully imported {imported_count} event(s) from Google Calendar'
+        if skipped_exported > 0:
+            message += f' (excluded {skipped_exported} event(s) previously exported from this app)'
         
         return jsonify({
             'success': True,
             'count': imported_count,
-            'message': f'Successfully imported {imported_count} event(s) from Google Calendar'
+            'skipped': skipped_exported,
+            'message': message
         })
         
     except Exception as e:

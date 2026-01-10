@@ -147,6 +147,21 @@ def _apply_schema_migrations() -> None:
             SET email_verified = TRUE
             WHERE email_verified = FALSE AND created_at < '2025-12-09';
         '''))
+        
+        # Add planning context fields (from cookies to DB)
+        db.session.execute(db.text('''
+            ALTER TABLE "user" 
+            ADD COLUMN IF NOT EXISTS last_completed_activity VARCHAR(500);
+        '''))
+        db.session.execute(db.text('''
+            ALTER TABLE "user" 
+            ADD COLUMN IF NOT EXISTS current_injuries VARCHAR(500);
+        '''))
+        db.session.execute(db.text('''
+            ALTER TABLE "user" 
+            ADD COLUMN IF NOT EXISTS additional_information TEXT;
+        '''))
+        
         db.session.commit()
         logger.info("Database migrations completed successfully")
     except Exception as e:
