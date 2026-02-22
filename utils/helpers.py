@@ -90,6 +90,7 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
         
         # Get weather forecast with sunrise/sunset
         temp_unit = 'fahrenheit' if unit == 'F' else 'celsius'
+        precip_unit_param = 'inch' if unit == 'F' else 'mm'  # Request inches for F, mm for C (will convert to cm)
         # Request daily variables for ground conditions
         # - snowfall_sum: total snowfall for the day
         # - rain_sum: total rain for the day
@@ -102,7 +103,7 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
             f"latitude={lat}&longitude={lon}"
             f"&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode,sunrise,sunset,snowfall_sum,rain_sum,wind_speed_10m_max,wind_gusts_10m_max"
             f"&hourly=precipitation,rain,snowfall,weathercode,temperature_2m,cloud_cover"
-            f"&timezone=auto&forecast_days=7&temperature_unit={temp_unit}&wind_speed_unit=mph"
+            f"&timezone=auto&forecast_days=7&temperature_unit={temp_unit}&wind_speed_unit=mph&precipitation_unit={precip_unit_param}"
         )
         weather_response = requests.get(weather_url, timeout=5)
         weather_data = weather_response.json()
@@ -134,6 +135,7 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
             next3_precip = None
             next3_rain = None
             next3_snow = None
+            precip_unit_fallback = 'in' if unit == 'F' else 'cm'
             if hourly_dt:
                 end = now_local + timedelta(hours=3)
                 total_precip = 0.0
@@ -144,17 +146,18 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                         total_precip += float(hourly.get('precipitation', [0]*len(hourly_dt))[idx] or 0)
                         total_rain += float(hourly.get('rain', [0]*len(hourly_dt))[idx] or 0)
                         total_snow += float(hourly.get('snowfall', [0]*len(hourly_dt))[idx] or 0)
-                # Convert from mm to inches or cm based on unit
+                # Convert based on what the API returned (fallback section)
+                # API returns: inches if F requested, mm if C requested
                 if unit == 'F':
-                    next3_precip = round(total_precip * 0.0393701, 2)  # inches
-                    next3_rain = round(total_rain * 0.0393701, 2)  # inches
-                    next3_snow = round(total_snow * 0.0393701, 2)  # inches
-                    precip_unit_fallback = 'in'
+                    # API returned in inches - use directly
+                    next3_precip = round(total_precip, 2)
+                    next3_rain = round(total_rain, 2)
+                    next3_snow = round(total_snow, 2)
                 else:
-                    next3_precip = round(total_precip * 0.1, 2)  # cm
-                    next3_rain = round(total_rain * 0.1, 2)  # cm
-                    next3_snow = round(total_snow * 0.1, 2)  # cm
-                    precip_unit_fallback = 'cm'
+                    # API returned in mm
+                    next3_precip = round(total_precip * 0.1, 2)  # mm to cm
+                    next3_rain = round(total_rain * 0.1, 2)  # mm to cm
+                    next3_snow = round(total_snow, 2)  # mm = cm for snow
 
             # Provide a minimal single-day entry for today with only next-3h info
             fallback_forecast = []
@@ -226,18 +229,20 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
             # Determine simple surface condition flags
             weathercode = weather_data['daily']['weathercode'][i]
             precipitation_prob = weather_data['daily']['precipitation_probability_max'][i]
-            snowfall_sum_mm = weather_data['daily'].get('snowfall_sum', [0]*7)[i] or 0
-            rain_sum_mm = weather_data['daily'].get('rain_sum', [0]*7)[i] or 0
+            snowfall_sum_raw = weather_data['daily'].get('snowfall_sum', [0]*7)[i] or 0
+            rain_sum_raw = weather_data['daily'].get('rain_sum', [0]*7)[i] or 0
             
-            # Convert to inches if Fahrenheit, keep as cm if Celsius
-            # 1 mm = 0.0393701 inches, 1 mm = 0.1 cm
+            # Convert based on what the API returned
+            # API returns: inches if F requested, mm if C requested
             if unit == 'F':
-                snowfall_sum = round(snowfall_sum_mm * 0.0393701, 2)  # inches
-                rain_sum = round(rain_sum_mm * 0.0393701, 2)  # inches
+                # API returned in inches - use directly
+                snowfall_sum = round(snowfall_sum_raw, 2)
+                rain_sum = round(rain_sum_raw, 2)
                 precip_unit = 'in'
             else:
-                snowfall_sum = round(snowfall_sum_mm * 0.1, 2)  # cm
-                rain_sum = round(rain_sum_mm * 0.1, 2)  # cm
+                # API returned in mm, use as-is (mm water equiv ≈ cm snow depth)
+                snowfall_sum = round(snowfall_sum_raw, 2)  # mm water equiv = cm snow depth
+                rain_sum = round(rain_sum_raw * 0.1, 2)  # mm to cm
                 precip_unit = 'cm'
             
             # Wind data (mph)
@@ -266,15 +271,18 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                         total_precip += float(hourly.get('precipitation', [0]*len(hourly_dt))[idx] or 0)
                         total_rain += float(hourly.get('rain', [0]*len(hourly_dt))[idx] or 0)
                         total_snow += float(hourly.get('snowfall', [0]*len(hourly_dt))[idx] or 0)
-                # Convert from mm to inches or cm based on unit
+                # Convert based on what the API returned (today section)
+                # API returns: inches if F requested, mm if C requested
                 if unit == 'F':
-                    next3_precip = round(total_precip * 0.0393701, 2)  # inches
-                    next3_rain = round(total_rain * 0.0393701, 2)  # inches
-                    next3_snow = round(total_snow * 0.0393701, 2)  # inches
+                    # API returned in inches - use directly
+                    next3_precip = round(total_precip, 2)
+                    next3_rain = round(total_rain, 2)
+                    next3_snow = round(total_snow, 2)
                 else:
-                    next3_precip = round(total_precip * 0.1, 2)  # cm
-                    next3_rain = round(total_rain * 0.1, 2)  # cm
-                    next3_snow = round(total_snow * 0.1, 2)  # cm
+                    # API returned in mm
+                    next3_precip = round(total_precip * 0.1, 2)  # mm to cm
+                    next3_rain = round(total_rain * 0.1, 2)  # mm to cm
+                    next3_snow = round(total_snow, 2)  # mm = cm for snow
 
             # Calculate average cloud cover for this day from hourly data
             cloud_cover_avg = None

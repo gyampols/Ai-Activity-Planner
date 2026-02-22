@@ -323,7 +323,7 @@
                 <span id="current-time" style="margin-left: 1rem; color: #666; font-size: 0.95rem;">🕐 --:--</span>
             </div>
             <button id="toggle-temp" class="btn" style="background: #34495e; color: white; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
-                Switch to °{{ 'C' if current_user.temperature_unit == 'F' else 'F' }}
+                Switch to °{{ 'C/cm' if current_user.temperature_unit == 'F' else 'F/in' }}
             </button>
         </div>
         <div class="weather-container">
@@ -334,6 +334,13 @@
                     {# Dynamic precipitation emoji based on weathercode #}
                     {% set wc = day.weathercode|default(0)|int %}
                     {% if wc in [95] %}⛈️{% elif wc in [96, 99] %}⛈️🧊{% elif wc in [71, 73, 75, 77, 85, 86] %}❄️{% elif wc in [56, 57, 66, 67] %}🌧️❄️{% elif wc in [51, 53, 55, 61, 63, 65, 80, 81, 82] %}🌧️{% else %}💧{% endif %}{{ day.precipitation }}%<br>
+                    {# Show actual precipitation amounts if present #}
+                    {% if day.rain_sum and day.rain_sum > 0 %}
+                    🌧️ {{ day.rain_sum }}{{ day.precip_unit }}<br>
+                    {% endif %}
+                    {% if day.snowfall_sum and day.snowfall_sum > 0 %}
+                    ❄️ {{ day.snowfall_sum }}{{ day.precip_unit }}<br>
+                    {% endif %}
                     ☁️{{ day.cloud_cover or 0 }}%<br>
                     💨{{ day.wind_speed or 0 }}mph<br>
                     <small style="color: #666;">🌅{{ day.sunrise }}<br> 🌇{{ day.sunset }}</small>
