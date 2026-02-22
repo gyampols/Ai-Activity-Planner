@@ -162,6 +162,16 @@ def _apply_schema_migrations() -> None:
             ADD COLUMN IF NOT EXISTS additional_information TEXT;
         '''))
         
+        # Add repeating event frequency and end date fields
+        db.session.execute(db.text('''
+            ALTER TABLE appointment 
+            ADD COLUMN IF NOT EXISTS repeat_frequency VARCHAR(20);
+        '''))
+        db.session.execute(db.text('''
+            ALTER TABLE appointment 
+            ADD COLUMN IF NOT EXISTS repeat_until DATE;
+        '''))
+        
         db.session.commit()
         logger.info("Database migrations completed successfully")
     except Exception as e:

@@ -290,6 +290,9 @@ DECISION PRINCIPLES:
             
             plan_json = json.loads(cleaned_text)
             
+            # Validate and fix conflicts with appointments
+            plan_json, conflicts_removed = _validate_and_fix_conflicts(plan_json, now)
+            
             # Increment generation counter on successful plan creation
             current_user.plan_generations_count += 1
             
@@ -298,7 +301,12 @@ DECISION PRINCIPLES:
             current_user.last_schedule_date = datetime.now()
             db.session.commit()
             
-            return jsonify({'plan': plan_json, 'structured': True})
+            response_data = {'plan': plan_json, 'structured': True}
+            if conflicts_removed:
+                response_data['conflicts_removed'] = conflicts_removed
+                response_data['warning'] = f"Note: {len(conflicts_removed)} activity/activities were automatically changed to 'Rest' due to conflicts with your appointments."
+            
+            return jsonify(response_data)
         except Exception as e:
             print(f"JSON parsing error: {e}")
             print(f"Plan text: {plan_text}")
@@ -315,6 +323,102 @@ DECISION PRINCIPLES:
     
     except Exception as e:
         return jsonify({'error': f'Error generating plan: {str(e)}'}), 500
+
+
+def _validate_and_fix_conflicts(plan_json, now):
+    """
+    Validate that planned activities don't conflict with appointments.
+    If conflicts are found, change the activity to 'Rest' and add a warning note.
+    
+    Returns: (modified_plan_json, list_of_conflicts)
+    """
+    conflicts_removed = []
+    
+    # Get appointments for the next 7 days
+    end_date = (now + timedelta(days=6)).date()
+    all_appointments = Appointment.query.filter_by(user_id=current_user.id).all()
+    
+    # Expand all appointments into occurrences
+    expanded_appointments = []
+    for apt in all_appointments:
+        occurrences = apt.get_occurrences(now.date(), end_date)
+        expanded_appointments.extend(occurrences)
+    
+    # Create a map of date -> list of appointments
+    appointments_by_date = {}
+    for apt in expanded_appointments:
+        date_key = apt['date'].strftime('%Y-%m-%d')
+        if date_key not in appointments_by_date:
+            appointments_by_date[date_key] = []
+        appointments_by_date[date_key].append(apt)
+    
+    # Check each day in the plan
+    for date_key, day_plan in plan_json.items():
+        if date_key not in appointments_by_date:
+            continue  # No appointments on this day
+        
+        # Check if this day has a planned activity (not Rest)
+        activity_name = day_plan.get('activity', '')
+        if activity_name.lower() in ['rest', 'rest day']:
+            continue  # Already a rest day, no conflict possible
+        
+        # Get the planned activity time
+        planned_time_str = day_plan.get('time', '')
+        planned_duration = day_plan.get('duration_minutes', 60)
+        
+        # Parse planned time
+        try:
+            if planned_time_str and ':' in planned_time_str:
+                from datetime import time as dt_time
+                hour, minute = map(int, planned_time_str.split(':'))
+                planned_time = dt_time(hour, minute)
+            else:
+                # No specific time, assume midday conflict risk
+                planned_time = None
+        except (ValueError, AttributeError):
+            planned_time = None
+        
+        # Check for conflicts with appointments on this day
+        has_conflict = False
+        conflicting_appointments = []
+        
+        for apt in appointments_by_date[date_key]:
+            # If either activity or appointment has no time, consider it a potential conflict
+            # (conservative approach - better to avoid scheduling than risk conflict)
+            if planned_time is None or apt['time'] is None:
+                has_conflict = True
+                conflicting_appointments.append(apt['title'])
+                continue
+            
+            # Both have times - check for overlap
+            # Convert times to minutes for easier comparison
+            planned_start_mins = planned_time.hour * 60 + planned_time.minute
+            planned_end_mins = planned_start_mins + planned_duration
+            
+            apt_start_mins = apt['time'].hour * 60 + apt['time'].minute
+            apt_duration = apt['duration_minutes'] or 60  # Default 1 hour if not specified
+            apt_end_mins = apt_start_mins + apt_duration
+            
+            # Check for overlap: activities overlap if one starts before the other ends
+            if (planned_start_mins < apt_end_mins and planned_end_mins > apt_start_mins):
+                has_conflict = True
+                conflicting_appointments.append(apt['title'])
+        
+        # If conflict found, change to Rest day
+        if has_conflict:
+            original_activity = day_plan.get('activity')
+            day_plan['activity'] = 'Rest'
+            conflict_note = f"Scheduled rest due to appointment conflict with: {', '.join(conflicting_appointments)}"
+            day_plan['notes'] = conflict_note
+            day_plan['time'] = ''  # Remove time for rest day
+            
+            conflicts_removed.append({
+                'date': date_key,
+                'original_activity': original_activity,
+                'conflicting_appointments': conflicting_appointments
+            })
+    
+    return plan_json, conflicts_removed
 
 
 def _build_planning_prompt(activities, now, current_date, current_time, 
@@ -340,13 +444,18 @@ def _build_planning_prompt(activities, now, current_date, current_time,
             info += f" - {activity.description}"
         activity_info.append(info)
     
-    # Get appointments for the next 7 days
+    # Get appointments for the next 7 days using expanded occurrences
     end_date = (now + timedelta(days=6)).date()
-    appointments = Appointment.query.filter(
-        Appointment.user_id == current_user.id,
-        Appointment.date >= now.date(),
-        Appointment.date <= end_date
-    ).order_by(Appointment.date.asc()).all()
+    
+    # Get all user appointments and expand repeating ones
+    all_appointments = Appointment.query.filter_by(user_id=current_user.id).all()
+    expanded_appointments = []
+    for apt in all_appointments:
+        occurrences = apt.get_occurrences(now.date(), end_date)
+        expanded_appointments.extend(occurrences)
+    
+    # Sort by date
+    expanded_appointments.sort(key=lambda x: (x['date'], x['time'] if x['time'] else datetime.min.time()))
     
     # Generate date keys for the next 7 days
     date_keys = []
@@ -366,17 +475,17 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
 """
     
     # Add appointments
-    if appointments:
+    if expanded_appointments:
         prompt += "\nScheduled Appointments & Responsibilities:\n"
-        for apt in appointments:
-            apt_date = apt.date.strftime('%A, %b %d (%Y-%m-%d)')
-            apt_info = f"- {apt.title} ({apt.appointment_type}) on {apt_date}"
-            if apt.time:
-                apt_info += f" at {apt.time.strftime('%I:%M %p')}"
-            if apt.duration_minutes:
-                apt_info += f" ({apt.duration_minutes} min)"
-            if apt.description:
-                apt_info += f" - {apt.description}"
+        for apt in expanded_appointments:
+            apt_date = apt['date'].strftime('%A, %b %d (%Y-%m-%d)')
+            apt_info = f"- {apt['title']} ({apt['appointment_type']}) on {apt_date}"
+            if apt['time']:
+                apt_info += f" at {apt['time'].strftime('%I:%M %p')}"
+            if apt['duration_minutes']:
+                apt_info += f" ({apt['duration_minutes']} min)"
+            if apt['description']:
+                apt_info += f" - {apt['description']}"
             prompt += apt_info + "\n"
         prompt += "\nIMPORTANT: Work activities around these appointments. Do NOT schedule conflicting activities.\n"
     
@@ -408,6 +517,11 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
             cloud_cover = day.get('cloud_cover', 0) or 0
             weathercode = day.get('weathercode', 0) or 0
             
+            # Get precipitation amounts
+            rain_sum = day.get('rain_sum', 0) or 0
+            snowfall_sum = day.get('snowfall_sum', 0) or 0
+            precip_unit = day.get('precip_unit', 'cm')
+            
             # Determine precipitation type from weathercode
             precip_type = 'none'
             if weathercode in [95]:
@@ -423,11 +537,11 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
             
             short_term = ''
             if day.get('is_today'):
-                nprecip = day.get('next3_precip_mm')
-                nrain = day.get('next3_rain_mm')
-                nsnow = day.get('next3_snow_mm')
+                nprecip = day.get('next3_precip')
+                nrain = day.get('next3_rain')
+                nsnow = day.get('next3_snow')
                 if nprecip is not None:
-                    short_term = f" | next 3h: precip {nprecip}mm, rain {nrain or 0}mm, snow {nsnow or 0}mm"
+                    short_term = f" | next 3h: precip {nprecip}{precip_unit}, rain {nrain or 0}{precip_unit}, snow {nsnow or 0}{precip_unit}"
             # Build surface/condition notes
             conditions = []
             if wet:
@@ -440,16 +554,22 @@ Please create a detailed weekly activity plan for someone who enjoys the followi
                 conditions.append(precip_type)
             surface_note = f" (Conditions: {', '.join(conditions)})" if conditions else ''
             
-            # Include precipitation type in forecast line
-            precip_info = f"Precipitation: {day['precipitation']}%"
+            # Build precipitation info with amounts
+            precip_parts = [f"{day['precipitation']}% chance"]
+            if rain_sum > 0:
+                precip_parts.append(f"{rain_sum}{precip_unit} rain")
+            if snowfall_sum > 0:
+                precip_parts.append(f"{snowfall_sum}{precip_unit} snow")
             if precip_type != 'none':
-                precip_info += f" ({precip_type})"
+                precip_parts.append(f"({precip_type})")
+            precip_info = "Precipitation: " + ", ".join(precip_parts)
             
             prompt += f"- {day['date_short']}: {day['temp_max']}°{temp_unit_display}, {precip_info}, Cloud: {cloud_cover}%, Wind: {wind_speed}mph{short_term}, "
             prompt += f"Sunrise: {day['sunrise']}, Sunset: {day['sunset']}{surface_note}\n"
         prompt += "\nIMPORTANT: Consider sunrise/sunset times for outdoor activities that require daylight. Schedule outdoor activities during daylight hours only.\n"
-        prompt += "If ground is wet or snowy, or if near-term rain/snow is expected (next 3h > 0mm), mark outdoor skateboarding/board sports as unsuitable and propose indoor alternatives (e.g., strength, mobility, stationary cardio).\n"
-        prompt += "SNOW GUIDANCE: During snow conditions, avoid outdoor cycling, running, and activities requiring dry ground. Suggest indoor workouts or winter-specific activities like indoor training.\n"
+        prompt += "PRECIPITATION GUIDANCE: Use actual precipitation amounts (rain/snow in cm or inches) to assess severity, not just percentages. Light rain (<0.5cm or <0.2in) may be acceptable for some activities. Heavy rain (>1cm or >0.4in) or any snow accumulation should prompt indoor alternatives.\n"
+        prompt += "If ground is wet or snowy, or if near-term rain/snow is expected (next 3h > 0), mark outdoor skateboarding/board sports as unsuitable and propose indoor alternatives (e.g., strength, mobility, stationary cardio).\n"
+        prompt += "SNOW GUIDANCE: During snow conditions (any measurable snowfall), avoid outdoor cycling, running, and activities requiring dry ground. Suggest indoor workouts or winter-specific activities like indoor training.\n"
         prompt += "THUNDERSTORM GUIDANCE: If thunderstorms are forecast, absolutely avoid ALL outdoor activities during that time. Prioritize safety and schedule indoor alternatives only.\n"
         prompt += "WIND GUIDANCE: If wind >= 15mph or gusts >= 25mph, avoid cycling, running on exposed routes, and outdoor activities affected by wind. Suggest indoor alternatives or sheltered locations.\n"
         prompt += "CLOUD GUIDANCE: High cloud cover (>80%) may reduce visibility and sunlight for outdoor activities like photography. Clear skies (<20%) are ideal for stargazing and outdoor photography.\n"

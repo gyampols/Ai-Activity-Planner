@@ -144,9 +144,17 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                         total_precip += float(hourly.get('precipitation', [0]*len(hourly_dt))[idx] or 0)
                         total_rain += float(hourly.get('rain', [0]*len(hourly_dt))[idx] or 0)
                         total_snow += float(hourly.get('snowfall', [0]*len(hourly_dt))[idx] or 0)
-                next3_precip = round(total_precip, 2)
-                next3_rain = round(total_rain, 2)
-                next3_snow = round(total_snow, 2)
+                # Convert from mm to inches or cm based on unit
+                if unit == 'F':
+                    next3_precip = round(total_precip * 0.0393701, 2)  # inches
+                    next3_rain = round(total_rain * 0.0393701, 2)  # inches
+                    next3_snow = round(total_snow * 0.0393701, 2)  # inches
+                    precip_unit_fallback = 'in'
+                else:
+                    next3_precip = round(total_precip * 0.1, 2)  # cm
+                    next3_rain = round(total_rain * 0.1, 2)  # cm
+                    next3_snow = round(total_snow * 0.1, 2)  # cm
+                    precip_unit_fallback = 'cm'
 
             # Provide a minimal single-day entry for today with only next-3h info
             fallback_forecast = []
@@ -162,15 +170,16 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                 'is_today': True,
                 'snowfall_sum': None,
                 'rain_sum': None,
+                'precip_unit': precip_unit_fallback if hourly_dt else 'cm',
                 'is_wet_ground': None,
                 'is_snowy_ground': None,
                 'wind_speed': None,
                 'wind_gusts': None,
                 'is_windy': False,
                 'cloud_cover': None,
-                'next3_precip_mm': next3_precip,
-                'next3_rain_mm': next3_rain,
-                'next3_snow_mm': next3_snow
+                'next3_precip': next3_precip,
+                'next3_rain': next3_rain,
+                'next3_snow': next3_snow
             })
 
             return {'forecast': fallback_forecast, 'timezone': timezone_str}
@@ -217,8 +226,19 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
             # Determine simple surface condition flags
             weathercode = weather_data['daily']['weathercode'][i]
             precipitation_prob = weather_data['daily']['precipitation_probability_max'][i]
-            snowfall_sum = weather_data['daily'].get('snowfall_sum', [0]*7)[i] or 0
-            rain_sum = weather_data['daily'].get('rain_sum', [0]*7)[i] or 0
+            snowfall_sum_mm = weather_data['daily'].get('snowfall_sum', [0]*7)[i] or 0
+            rain_sum_mm = weather_data['daily'].get('rain_sum', [0]*7)[i] or 0
+            
+            # Convert to inches if Fahrenheit, keep as cm if Celsius
+            # 1 mm = 0.0393701 inches, 1 mm = 0.1 cm
+            if unit == 'F':
+                snowfall_sum = round(snowfall_sum_mm * 0.0393701, 2)  # inches
+                rain_sum = round(rain_sum_mm * 0.0393701, 2)  # inches
+                precip_unit = 'in'
+            else:
+                snowfall_sum = round(snowfall_sum_mm * 0.1, 2)  # cm
+                rain_sum = round(rain_sum_mm * 0.1, 2)  # cm
+                precip_unit = 'cm'
             
             # Wind data (mph)
             wind_speed = weather_data['daily'].get('wind_speed_10m_max', [0]*7)[i] or 0
@@ -246,9 +266,15 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                         total_precip += float(hourly.get('precipitation', [0]*len(hourly_dt))[idx] or 0)
                         total_rain += float(hourly.get('rain', [0]*len(hourly_dt))[idx] or 0)
                         total_snow += float(hourly.get('snowfall', [0]*len(hourly_dt))[idx] or 0)
-                next3_precip = round(total_precip, 2)
-                next3_rain = round(total_rain, 2)
-                next3_snow = round(total_snow, 2)
+                # Convert from mm to inches or cm based on unit
+                if unit == 'F':
+                    next3_precip = round(total_precip * 0.0393701, 2)  # inches
+                    next3_rain = round(total_rain * 0.0393701, 2)  # inches
+                    next3_snow = round(total_snow * 0.0393701, 2)  # inches
+                else:
+                    next3_precip = round(total_precip * 0.1, 2)  # cm
+                    next3_rain = round(total_rain * 0.1, 2)  # cm
+                    next3_snow = round(total_snow * 0.1, 2)  # cm
 
             # Calculate average cloud cover for this day from hourly data
             cloud_cover_avg = None
@@ -277,6 +303,7 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                 # Extended fields used by planning logic/UI
                 'snowfall_sum': snowfall_sum,
                 'rain_sum': rain_sum,
+                'precip_unit': precip_unit,
                 'is_wet_ground': bool(is_wet),
                 'is_snowy_ground': bool(is_snowy_ground),
                 # Wind data (mph)
@@ -285,10 +312,10 @@ def get_weather_forecast(location: str, unit: str = 'C') -> Optional[Dict[str, A
                 'is_windy': bool(is_windy),
                 # Cloud cover (%)
                 'cloud_cover': cloud_cover_avg,
-                # Hourly next-3-hours summary (mm)
-                'next3_precip_mm': next3_precip,
-                'next3_rain_mm': next3_rain,
-                'next3_snow_mm': next3_snow
+                # Hourly next-3-hours summary (in or cm)
+                'next3_precip': next3_precip,
+                'next3_rain': next3_rain,
+                'next3_snow': next3_snow
             })
         
         # Return both forecast and timezone

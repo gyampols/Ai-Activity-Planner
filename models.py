@@ -146,11 +146,162 @@ class Appointment(db.Model):
     time = db.Column(db.Time, nullable=True)
     duration_minutes = db.Column(db.Integer, nullable=True)
     appointment_type = db.Column(db.String(50), nullable=True)
-    repeating_days = db.Column(db.String(200), nullable=True)
+    
+    # Repetition configuration
+    repeating_days = db.Column(db.String(200), nullable=True)  # Comma-separated days: "Monday,Wednesday,Friday"
+    repeat_frequency = db.Column(db.String(20), nullable=True)  # 'daily', 'weekly', 'biweekly', 'monthly'
+    repeat_until = db.Column(db.Date, nullable=True)  # End date for repetition (None = repeats forever)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f'<Appointment {self.title} on {self.date}>'
+    
+    def get_occurrences(self, start_date, end_date):
+        """
+        Generate all occurrences of this appointment between start_date and end_date.
+        
+        For repeating appointments, this expands them into individual instances.
+        For one-time appointments, returns a single occurrence if within range.
+        
+        Returns list of dicts with keys: date, time, title, description, duration_minutes, appointment_type
+        """
+        from datetime import timedelta
+        
+        occurrences = []
+        
+        # If not repeating or no frequency set, treat as one-time event
+        if not self.repeat_frequency or not self.repeating_days:
+            if start_date <= self.date <= end_date:
+                occurrences.append({
+                    'id': self.id,
+                    'date': self.date,
+                    'time': self.time,
+                    'title': self.title,
+                    'description': self.description,
+                    'duration_minutes': self.duration_minutes,
+                    'appointment_type': self.appointment_type,
+                    'is_repeating': False
+                })
+            return occurrences
+        
+        # Parse repeating days
+        repeat_days = [day.strip() for day in self.repeating_days.split(',') if day.strip()]
+        day_map = {
+            'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
+            'Friday': 4, 'Saturday': 5, 'Sunday': 6
+        }
+        repeat_weekdays = [day_map.get(day) for day in repeat_days if day in day_map]
+        
+        if not repeat_weekdays:
+            # No valid days, treat as one-time
+            if start_date <= self.date <= end_date:
+                occurrences.append({
+                    'id': self.id,
+                    'date': self.date,
+                    'time': self.time,
+                    'title': self.title,
+                    'description': self.description,
+                    'duration_minutes': self.duration_minutes,
+                    'appointment_type': self.appointment_type,
+                    'is_repeating': False
+                })
+            return occurrences
+        
+        # Determine the effective end date for repetition
+        effective_end = end_date
+        if self.repeat_until:
+            effective_end = min(end_date, self.repeat_until)
+        
+        # Start from the appointment's original date
+        current_date = max(start_date, self.date)
+        
+        # Generate occurrences based on frequency
+        if self.repeat_frequency == 'daily':
+            # Every day
+            while current_date <= effective_end:
+                occurrences.append({
+                    'id': self.id,
+                    'date': current_date,
+                    'time': self.time,
+                    'title': self.title,
+                    'description': self.description,
+                    'duration_minutes': self.duration_minutes,
+                    'appointment_type': self.appointment_type,
+                    'is_repeating': True
+                })
+                current_date += timedelta(days=1)
+        
+        elif self.repeat_frequency == 'weekly':
+            # Every week on specified days
+            while current_date <= effective_end:
+                if current_date.weekday() in repeat_weekdays:
+                    occurrences.append({
+                        'id': self.id,
+                        'date': current_date,
+                        'time': self.time,
+                        'title': self.title,
+                        'description': self.description,
+                        'duration_minutes': self.duration_minutes,
+                        'appointment_type': self.appointment_type,
+                        'is_repeating': True
+                    })
+                current_date += timedelta(days=1)
+        
+        elif self.repeat_frequency == 'biweekly':
+            # Every 2 weeks on specified days
+            # Track which week we're in relative to start
+            week_start = self.date - timedelta(days=self.date.weekday())
+            while current_date <= effective_end:
+                weeks_diff = (current_date - week_start).days // 7
+                if weeks_diff % 2 == 0 and current_date.weekday() in repeat_weekdays:
+                    occurrences.append({
+                        'id': self.id,
+                        'date': current_date,
+                        'time': self.time,
+                        'title': self.title,
+                        'description': self.description,
+                        'duration_minutes': self.duration_minutes,
+                        'appointment_type': self.appointment_type,
+                        'is_repeating': True
+                    })
+                current_date += timedelta(days=1)
+        
+        elif self.repeat_frequency == 'monthly':
+            # Same day of month, every month
+            target_day = self.date.day
+            temp_date = self.date
+            
+            while temp_date <= effective_end:
+                if temp_date >= start_date:
+                    occurrences.append({
+                        'id': self.id,
+                        'date': temp_date,
+                        'time': self.time,
+                        'title': self.title,
+                        'description': self.description,
+                        'duration_minutes': self.duration_minutes,
+                        'appointment_type': self.appointment_type,
+                        'is_repeating': True
+                    })
+                
+                # Move to next month
+                if temp_date.month == 12:
+                    next_month = temp_date.replace(year=temp_date.year + 1, month=1, day=1)
+                else:
+                    next_month = temp_date.replace(month=temp_date.month + 1, day=1)
+                
+                # Try to use the same day of month
+                try:
+                    temp_date = next_month.replace(day=target_day)
+                except ValueError:
+                    # Day doesn't exist in this month (e.g., Feb 31), use last day
+                    if next_month.month == 12:
+                        temp_date = next_month.replace(year=next_month.year + 1, month=1, day=1) - timedelta(days=1)
+                    else:
+                        temp_date = next_month.replace(month=next_month.month + 1, day=1) - timedelta(days=1)
+        
+        return occurrences
 
 
 class StatusChangeType(db.Model):
